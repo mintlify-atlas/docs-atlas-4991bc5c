@@ -428,12 +428,12 @@ const bancolombiaAccounts = await clients.accounts.bancolombia.list();
 Provides access to KYC/KYB verification:
 
 ```typescript
-const verification = await clients.compliance.verify({
-  type: 'individual',
-  firstName: 'John',
-  lastName: 'Doe',
-  // ...
+const verification = await clients.compliance.kyc.startVerification({
+  urn: clients.urn,
+  webhookUrl: 'https://api.example.com/webhooks/kyc'
 });
+
+console.log(verification.url); // Direct user to this URL
 ```
 
 ### identity
@@ -442,7 +442,9 @@ Provides access to identity management:
 
 ```typescript
 const profile = await clients.identity.me();
-const aliases = await clients.identity.listAliases();
+
+// Get alias information
+const alias = await clients.identity.aliases.get('user@example.com');
 ```
 
 ### orgs
@@ -450,8 +452,13 @@ const aliases = await clients.identity.listAliases();
 Provides access to organization management:
 
 ```typescript
-const organizations = await clients.orgs.list();
-const members = await clients.orgs.listMembers('org-id');
+const organization = await clients.orgs.create({
+  profile: {
+    type: 'business',
+    name: 'Acme Inc',
+    // ... business profile fields
+  }
+});
 ```
 
 ### swap
@@ -459,11 +466,15 @@ const members = await clients.orgs.listMembers('org-id');
 Provides access to swap operations:
 
 ```typescript
-const quote = await clients.swap.quote({
-  from: 'USD',
-  to: 'EUR',
-  amount: 100
+const rates = await clients.swap.findRates({
+  fromAsset: 'COP/2',
+  toAsset: 'DUSD/6',
+  fromMediums: ['pse'],
+  toMediums: ['kusama'],
+  amountSrc: '10000000'
 });
+
+console.log(rates.rates[0].ratio);
 ```
 
 ### urn

@@ -8,15 +8,19 @@ description: 'Client for managing identity aliases like phone numbers and email 
 The `AliasesClient` allows you to retrieve and manage aliases associated with identities. Aliases are alternative identifiers like phone numbers, email addresses, or blockchain addresses that can be used to look up an identity.
 
 ```typescript
-import { BloqueSDK } from '@bloque/sdk';
+import { SDK } from '@bloque/sdk';
 
-const bloque = await BloqueSDK.connect({
-  apiKey: 'your-api-key',
-  platform: 'node'
+const bloque = new SDK({
+  origin: 'your-origin',
+  auth: {
+    type: 'apiKey',
+    apiKey: 'your-api-key'
+  },
+  mode: 'production'
 });
 
-// Access aliases client
-const aliases = bloque.identity.aliases;
+const session = await bloque.connect('user@example.com');
+const aliases = session.identity.aliases;
 ```
 
 ## Methods

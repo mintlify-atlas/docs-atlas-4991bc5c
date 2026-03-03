@@ -8,14 +8,19 @@ description: 'Client for managing identity origins and user registration'
 The `OriginsClient` manages identity origins and handles user registration. Origins represent entry points for identities - organizations, blockchains, or authentication providers that can hold a set of identities.
 
 ```typescript
-import { BloqueSDK } from '@bloque/sdk';
+import { SDK } from '@bloque/sdk';
 
-const bloque = await BloqueSDK.connect({
-  apiKey: 'your-api-key',
-  platform: 'node'
+const bloque = new SDK({
+  origin: 'your-origin',
+  auth: {
+    type: 'apiKey',
+    apiKey: 'your-api-key'
+  },
+  mode: 'production'
 });
 
-const origins = bloque.identity.origins;
+const session = await bloque.connect('user@example.com');
+const origins = session.identity.origins;
 ```
 
 ## Properties

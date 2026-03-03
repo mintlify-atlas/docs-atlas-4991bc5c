@@ -8,14 +8,19 @@ description: 'Client for creating and managing organizations'
 The `OrgsClient` manages organizational entities within the Bloque platform. Organizations can represent businesses or individual entities with full profile information and compliance status.
 
 ```typescript
-import { BloqueSDK } from '@bloque/sdk';
+import { SDK } from '@bloque/sdk';
 
-const bloque = await BloqueSDK.connect({
-  apiKey: 'your-api-key',
-  platform: 'node'
+const bloque = new SDK({
+  origin: 'your-origin',
+  auth: {
+    type: 'apiKey',
+    apiKey: 'your-api-key'
+  },
+  mode: 'production'
 });
 
-const orgs = bloque.orgs;
+const session = await bloque.connect('user@example.com');
+const orgs = session.orgs;
 ```
 
 ## Methods

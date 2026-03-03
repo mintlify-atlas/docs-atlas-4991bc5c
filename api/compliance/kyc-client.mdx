@@ -8,14 +8,19 @@ description: 'Client for managing Know Your Customer (KYC) verification processe
 The `KycClient` handles KYC (Know Your Customer) verification workflows for individuals. It provides methods to initiate verification processes and check verification status.
 
 ```typescript
-import { BloqueSDK } from '@bloque/sdk';
+import { SDK } from '@bloque/sdk';
 
-const bloque = await BloqueSDK.connect({
-  apiKey: 'your-api-key',
-  platform: 'node'
+const bloque = new SDK({
+  origin: 'your-origin',
+  auth: {
+    type: 'apiKey',
+    apiKey: 'your-api-key'
+  },
+  mode: 'production'
 });
 
-const kyc = bloque.compliance.kyc;
+const session = await bloque.connect('user@example.com');
+const kyc = session.compliance.kyc;
 ```
 
 ## Methods

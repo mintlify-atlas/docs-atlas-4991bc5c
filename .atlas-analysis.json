@@ -1,0 +1,175 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Bloque SDK",
+  "projectDescription": "Official TypeScript/JavaScript SDK for the Bloque financial platform with multi-account support, swaps, and compliance features",
+  "theme": "palm",
+  "primaryColor": "#6366F1",
+  "lightColor": "#818CF8",
+  "darkColor": "#4F46E5",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation",
+              "authentication"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/platform-support",
+              "concepts/configuration",
+              "concepts/error-handling",
+              "concepts/urns"
+            ]
+          },
+          {
+            "group": "Accounts",
+            "pages": [
+              "accounts/overview",
+              "accounts/card",
+              "accounts/virtual",
+              "accounts/polygon",
+              "accounts/bancolombia",
+              "accounts/us-accounts"
+            ]
+          },
+          {
+            "group": "Swap & Exchange",
+            "pages": [
+              "swap/overview",
+              "swap/rates",
+              "swap/pse",
+              "swap/bank-transfers"
+            ]
+          },
+          {
+            "group": "Identity & Compliance",
+            "pages": [
+              "identity/overview",
+              "identity/aliases",
+              "identity/origins",
+              "compliance/kyc"
+            ]
+          },
+          {
+            "group": "Organizations",
+            "pages": [
+              "organizations/overview",
+              "organizations/management"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/transfers",
+              "guides/spending-controls",
+              "guides/webhooks",
+              "guides/metadata"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "SDK",
+            "pages": [
+              "api/sdk",
+              "api/configuration"
+            ]
+          },
+          {
+            "group": "Accounts",
+            "pages": [
+              "api/accounts/card-client",
+              "api/accounts/virtual-client",
+              "api/accounts/polygon-client",
+              "api/accounts/bancolombia-client",
+              "api/accounts/us-client"
+            ]
+          },
+          {
+            "group": "Swap",
+            "pages": [
+              "api/swap/swap-client",
+              "api/swap/pse-client",
+              "api/swap/bank-transfer-client"
+            ]
+          },
+          {
+            "group": "Identity",
+            "pages": [
+              "api/identity/identity-client",
+              "api/identity/aliases-client",
+              "api/identity/origins-client"
+            ]
+          },
+          {
+            "group": "Compliance",
+            "pages": [
+              "api/compliance/kyc-client"
+            ]
+          },
+          {
+            "group": "Organizations",
+            "pages": [
+              "api/organizations/orgs-client"
+            ]
+          },
+          {
+            "group": "Core",
+            "pages": [
+              "api/core/errors",
+              "api/core/types"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-account support (cards, Polygon wallets, virtual accounts, Bancolombia, US accounts)",
+    "Currency exchange and swap functionality with PSE and bank transfers",
+    "KYC/KYB compliance verification",
+    "Identity management with aliases and origins",
+    "Organization management for multi-tenant applications",
+    "Multi-platform support (Node.js, Bun, Deno, browsers, React Native)"
+  ],
+  "publicApiSurface": [
+    "SDK",
+    "SDK.connect()",
+    "SDK.register()",
+    "SDK.authenticate()",
+    "AccountsClient",
+    "CardClient.create()",
+    "CardClient.list()",
+    "CardClient.listMovements()",
+    "VirtualClient.create()",
+    "PolygonClient.create()",
+    "BancolombiaClient.create()",
+    "USClient.create()",
+    "SwapClient.findRates()",
+    "PseClient.listBanks()",
+    "PseClient.createOrder()",
+    "BankTransferClient.createOrder()",
+    "IdentityClient.me()",
+    "AliasesClient.create()",
+    "OriginsClient.register()",
+    "ComplianceClient.kyc",
+    "KycClient.submit()",
+    "OrgsClient.create()",
+    "BloqueAPIError",
+    "BloqueAuthenticationError",
+    "BloqueValidationError",
+    "BloqueRateLimitError",
+    "BloqueInsufficientFundsError"
+  ]
+}

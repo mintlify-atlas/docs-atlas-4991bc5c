@@ -1,0 +1,319 @@
+---
+title: URNs (Uniform Resource Names)
+description: Understanding Bloque's URN format for identity and resource identification
+---
+
+Bloque uses URNs (Uniform Resource Names) as a standardized way to identify identities and resources across the platform. URNs provide a consistent, globally unique identifier format.
+
+## URN Format
+
+Bloque URNs follow the Decentralized Identifier (DID) specification:
+
+```
+did:bloque:{origin}:{alias}
+```
+
+<ParamField path="did" type="string">
+  DID method prefix (always `"did"`)
+</ParamField>
+
+<ParamField path="bloque" type="string">
+  DID method name (always `"bloque"`)
+</ParamField>
+
+<ParamField path="origin" type="string">
+  Origin identifier that scopes the identity to your application or organization
+</ParamField>
+
+<ParamField path="alias" type="string">
+  Unique identifier for the user within the origin (email, phone, username, etc.)
+</ParamField>
+
+## URN Examples
+
+```typescript Examples
+// Email-based identity
+"did:bloque:my-app:user@example.com"
+
+// Phone-based identity
+"did:bloque:my-app:+1234567890"
+
+// Username-based identity
+"did:bloque:my-app:johndoe"
+
+// Custom identifier
+"did:bloque:my-app:customer-12345"
+```
+
+## URN Construction
+
+The SDK automatically constructs URNs when you register or connect to an identity. You can also access the URN building logic:
+
+```typescript Automatic URN Construction
+import { SDK } from '@bloque/sdk';
+
+const sdk = new SDK({
+  auth: { type: 'apiKey', apiKey: 'key_...' },
+  origin: 'my-app'
+});
+
+// Register a new identity - URN is constructed automatically
+const session = await sdk.register('user@example.com', {
+  firstName: 'John',
+  lastName: 'Doe'
+});
+
+// Access the URN
+console.log(session.urn);
+// Output: "did:bloque:my-app:user@example.com"
+```
+
+The URN construction happens in the SDK's `buildUrn` method:
+
+```typescript packages/sdk/src/bloque.ts:40-47
+private buildUrn(alias: string): string {
+  const origin = this.httpClient.origin;
+  if (!origin) {
+    throw new Error('Origin is required to build a urn');
+  }
+
+  return `did:bloque:${origin}:${alias}`;
+}
+```
+
+## Accessing URNs
+
+After successfully authenticating, the URN is available through the session object:
+
+```typescript
+const session = await sdk.connect('user@example.com');
+
+// Access the URN
+const userUrn = session.urn;
+console.log(userUrn); // "did:bloque:my-app:user@example.com"
+
+// Use URN for resource operations
+const account = await session.accounts.virtual.create({
+  currency: 'USD'
+});
+```
+
+## URN Scoping
+
+### Origin-Based Scoping
+
+URNs are scoped to an **origin**, which represents your application or organization. This ensures identities are isolated between different applications:
+
+<CodeGroup>
+```typescript App 1
+const sdk1 = new SDK({
+  auth: { type: 'apiKey', apiKey: 'key_app1_...' },
+  origin: 'app-1'
+});
+
+const session1 = await sdk1.connect('user@example.com');
+console.log(session1.urn);
+// "did:bloque:app-1:user@example.com"
+```
+
+```typescript App 2
+const sdk2 = new SDK({
+  auth: { type: 'apiKey', apiKey: 'key_app2_...' },
+  origin: 'app-2'
+});
+
+const session2 = await sdk2.connect('user@example.com');
+console.log(session2.urn);
+// "did:bloque:app-2:user@example.com"
+```
+</CodeGroup>
+
+<Info>
+These are two **different identities** even though they use the same alias. The origin provides isolation.
+</Info>
+
+### Alias Uniqueness
+
+Aliases must be unique within an origin. Attempting to register a duplicate alias will result in a validation error:
+
+```typescript
+const sdk = new SDK({
+  auth: { type: 'apiKey', apiKey: 'key_...' },
+  origin: 'my-app'
+});
+
+// First registration succeeds
+await sdk.register('user@example.com', {
+  firstName: 'John',
+  lastName: 'Doe'
+});
+
+// Second registration with same alias fails
+try {
+  await sdk.register('user@example.com', {
+    firstName: 'Jane',
+    lastName: 'Smith'
+  });
+} catch (error) {
+  // BloqueValidationError: Alias already exists
+}
+```
+
+## URN Usage Patterns
+
+### Identity Lookup
+
+Use URNs to look up and reference identities:
+
+```typescript
+// Get identity information
+const identity = await session.identity.get('did:bloque:my-app:user@example.com');
+
+console.log(identity.urn);        // "did:bloque:my-app:user@example.com"
+console.log(identity.firstName);  // "John"
+console.log(identity.lastName);   // "Doe"
+```
+
+### Resource Association
+
+Resources (like accounts) are automatically associated with the authenticated identity's URN:
+
+```typescript
+const session = await sdk.connect('user@example.com');
+// session.urn = "did:bloque:my-app:user@example.com"
+
+// Create account - automatically associated with the URN
+const account = await session.accounts.virtual.create({
+  currency: 'USD'
+});
+
+// Account is owned by the identity with this URN
+console.log(account.holderUrn); // "did:bloque:my-app:user@example.com"
+```
+
+### Multi-Origin Identity
+
+The same person can have different URNs across different origins:
+
+```typescript Multi-App Scenario
+// User in mobile app
+const mobileSession = await mobileSdk.connect('user@example.com');
+// URN: "did:bloque:mobile-app:user@example.com"
+
+// Same user in web app
+const webSession = await webSdk.connect('user@example.com');
+// URN: "did:bloque:web-app:user@example.com"
+
+// These are separate identities with separate data
+```
+
+## URN Validation
+
+When working with URNs manually, ensure they follow the correct format:
+
+```typescript
+function isValidBloqueUrn(urn: string): boolean {
+  // Basic URN format validation
+  const urnPattern = /^did:bloque:[a-zA-Z0-9-_]+:.+$/;
+  return urnPattern.test(urn);
+}
+
+// Valid URNs
+console.log(isValidBloqueUrn('did:bloque:my-app:user@example.com')); // true
+console.log(isValidBloqueUrn('did:bloque:prod:+1234567890'));        // true
+
+// Invalid URNs
+console.log(isValidBloqueUrn('bloque:my-app:user'));                 // false
+console.log(isValidBloqueUrn('did:other:my-app:user'));              // false
+```
+
+## URN Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Stable Aliases" icon="anchor">
+    Choose aliases that won't change (email, phone, user ID) rather than temporary values
+  </Card>
+  
+  <Card title="Origin Naming" icon="tag">
+    Use descriptive, kebab-case origin names (e.g., `my-mobile-app`, `production-api`)
+  </Card>
+  
+  <Card title="Don't Parse URNs" icon="code">
+    Use the SDK's URN property rather than parsing URN strings manually
+  </Card>
+  
+  <Card title="Store URNs" icon="database">
+    Store the complete URN in your database for future reference and lookups
+  </Card>
+</CardGroup>
+
+## JWT Authentication URN Resolution
+
+When using JWT authentication, the URN is resolved during the `authenticate()` or `connect()` flow:
+
+<Tabs>
+  <Tab title="authenticate() - Auto-resolve">
+    ```typescript
+    const sdk = new SDK({
+      platform: 'browser',
+      auth: { type: 'jwt' }
+      // origin not required - will be resolved
+    });
+    
+    // Authenticate with existing JWT
+    const session = await sdk.authenticate();
+    
+    // Origin and URN are resolved from the JWT
+    console.log(session.urn);    // "did:bloque:resolved-origin:user@example.com"
+    ```
+  </Tab>
+  
+  <Tab title="connect() - Explicit origin">
+    ```typescript
+    const sdk = new SDK({
+      platform: 'browser',
+      auth: { type: 'jwt' }
+    });
+    
+    // Request OTP
+    await sdk.assert('my-app', 'user@example.com');
+    
+    // Connect with OTP code
+    const session = await sdk.connect('my-app', 'user@example.com', '123456');
+    
+    console.log(session.urn);    // "did:bloque:my-app:user@example.com"
+    ```
+  </Tab>
+</Tabs>
+
+## URN in API Responses
+
+Many API responses include URN fields for identity references:
+
+```typescript
+const identity = await session.identity.me();
+
+console.log(identity);
+// {
+//   urn: "did:bloque:my-app:user@example.com",
+//   origin: "my-app",
+//   aliases: ["user@example.com"],
+//   firstName: "John",
+//   lastName: "Doe",
+//   ...
+// }
+```
+
+## Related Concepts
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/concepts/configuration">
+    Learn about the `origin` configuration option
+  </Card>
+  <Card title="Authentication" icon="key" href="/quickstart">
+    Register and connect identities
+  </Card>
+  <Card title="Identity API" icon="user" href="/api/identity/identity-client">
+    Manage identities and aliases
+  </Card>
+</CardGroup>

@@ -1,0 +1,333 @@
+---
+title: Card Spending Controls
+description: Route card transactions to different pockets based on merchant category codes
+---
+
+## Overview
+
+Bloque's smart spending controls allow you to route card transactions to different virtual accounts (pockets) based on **Merchant Category Codes (MCCs)**. This enables powerful budgeting scenarios:
+
+- Separate food spending from general expenses
+- Auto-route transportation costs to a transit budget
+- Create category-specific spending limits
+- Track spending by category automatically
+
+## Spending Control Types
+
+There are two types of spending controls:
+
+1. **Default** - All transactions debit from a single pocket (simple setup)
+2. **Smart** - Transactions route to different pockets based on MCC codes (advanced budgeting)
+
+## Default Spending Control
+
+The simplest setup: one pocket, one card, all merchants accepted.
+
+<Steps>
+  <Step title="Create a virtual account">
+    Create a pocket to hold funds:
+
+    ```typescript
+    import { SDK } from '@bloque/sdk';
+
+    const bloque = new SDK({
+      origin: process.env.ORIGIN!,
+      auth: {
+        type: 'apiKey',
+        apiKey: process.env.API_KEY!,
+      },
+      mode: 'production',
+    });
+
+    const user = await bloque.connect('@username');
+
+    const pocket = await user.accounts.virtual.create(
+      {},
+      { waitLedger: true }
+    );
+    ```
+  </Step>
+
+  <Step title="Create a card with default control">
+    Link the card to the pocket:
+
+    ```typescript
+    const card = await user.accounts.card.create(
+      {
+        name: 'My Everyday Card',
+        ledgerId: pocket.ledgerId,
+        metadata: {
+          spending_control: 'default',
+          preferred_asset: 'DUSD/6',
+          default_asset: 'DUSD/6',
+        },
+      },
+      { waitLedger: true },
+    );
+
+    console.log('Card created:', card.urn);
+    console.log('All purchases will debit from:', pocket.urn);
+    ```
+  </Step>
+</Steps>
+
+<Note>
+The `spending_control: 'default'` is optional—it's the default behavior. The card will accept purchases at **any** merchant and debit from the linked pocket.
+</Note>
+
+## Smart Spending with MCC Routing
+
+Route transactions to different pockets based on where the purchase happens.
+
+### How It Works
+
+<Steps>
+  <Step title="Purchase comes in">
+    A card transaction arrives with a Merchant Category Code (MCC)
+  </Step>
+  <Step title="Check MCC whitelist">
+    The system checks each pocket in `priority_mcc` order
+  </Step>
+  <Step title="Match or fallthrough">
+    - If the MCC matches a pocket's whitelist → debit from that pocket
+    - If no match → try the next pocket in line
+    - Pockets without a whitelist entry are "catch-all" (accept any MCC)
+  </Step>
+</Steps>
+
+### Example: Food Budget Routing
+
+Create separate pockets for food and general spending:
+
+```typescript
+// Step 1: Create a food pocket (groceries & restaurants only)
+const foodPocket = await user.accounts.virtual.create(
+  { name: 'Food Budget' },
+  { waitLedger: true },
+);
+
+// Step 2: Create main wallet (catches everything else)
+const mainWallet = await user.accounts.virtual.create(
+  { name: 'Main Wallet' },
+  { waitLedger: true },
+);
+
+// Step 3: Create card with smart spending control
+const card = await user.accounts.card.create(
+  {
+    name: 'Smart Card',
+    ledgerId: mainWallet.ledgerId,
+    metadata: {
+      spending_control: 'smart',
+      preferred_asset: 'DUSD/6',
+      default_asset: 'DUSD/6',
+
+      // Which MCCs each pocket accepts
+      mcc_whitelist: {
+        [foodPocket.urn]: [
+          '5411', // Grocery stores
+          '5812', // Restaurants
+          '5814', // Fast food
+        ],
+        // mainWallet has NO entry = catch-all
+      },
+
+      // Priority order: check food pocket first, then main wallet
+      priority_mcc: [foodPocket.urn, mainWallet.urn],
+    },
+  },
+  { waitLedger: true },
+);
+```
+
+<Tip>
+**How transactions are routed:**
+- Buy groceries (MCC 5411) → debits from Food Budget
+- Buy at restaurant (MCC 5812) → debits from Food Budget  
+- Random online purchase → debits from Main Wallet (catch-all)
+</Tip>
+
+## Multiple Category Pockets
+
+Create dedicated pockets for each spending category:
+
+```typescript
+// Create category pockets
+const foodPocket = await user.accounts.virtual.create(
+  { name: 'Food' },
+  { waitLedger: true },
+);
+
+const transportPocket = await user.accounts.virtual.create(
+  { name: 'Transport' },
+  { waitLedger: true },
+);
+
+const generalPocket = await user.accounts.virtual.create(
+  { name: 'General' },
+  { waitLedger: true },
+);
+
+// Create card with multi-category routing
+const card = await user.accounts.card.create(
+  {
+    name: 'Budget Master',
+    ledgerId: generalPocket.ledgerId,
+    metadata: {
+      spending_control: 'smart',
+      preferred_asset: 'DUSD/6',
+      default_asset: 'DUSD/6',
+
+      mcc_whitelist: {
+        [foodPocket.urn]: [
+          '5411', // Grocery stores
+          '5812', // Restaurants
+          '5814', // Fast food
+        ],
+        [transportPocket.urn]: [
+          '4111', // Local commuter transport
+          '4121', // Taxis and rideshares
+          '4131', // Bus lines
+          '5541', // Service stations (gas)
+          '5542', // Fuel dealers
+        ],
+        // generalPocket has NO entry = catch-all
+      },
+
+      // Priority order matters!
+      priority_mcc: [
+        foodPocket.urn,
+        transportPocket.urn,
+        generalPocket.urn,
+      ],
+    },
+  },
+  { waitLedger: true },
+);
+```
+
+## Common MCC Categories
+
+<AccordionGroup>
+  <Accordion title="Food & Dining">
+    - `5411` - Grocery stores, supermarkets
+    - `5812` - Eating places, restaurants
+    - `5814` - Fast food restaurants
+    - `5499` - Miscellaneous food stores
+  </Accordion>
+
+  <Accordion title="Transportation">
+    - `4111` - Local/suburban commuter passenger transportation
+    - `4121` - Taxicabs and limousines
+    - `4131` - Bus lines
+    - `5541` - Service stations (with or without ancillary services)
+    - `5542` - Automated fuel dispensers
+  </Accordion>
+
+  <Accordion title="Entertainment">
+    - `7832` - Motion picture theaters
+    - `7841` - Video rental stores
+    - `7911` - Dance halls, studios, and schools
+    - `7922` - Theatrical producers (except motion pictures)
+    - `7929` - Bands, orchestras, and miscellaneous entertainers
+  </Accordion>
+
+  <Accordion title="Health & Wellness">
+    - `5912` - Drug stores and pharmacies
+    - `8011` - Doctors and physicians (not elsewhere classified)
+    - `8021` - Dentists and orthodontists
+    - `8099` - Medical services and health practitioners
+  </Accordion>
+
+  <Accordion title="Shopping">
+    - `5311` - Department stores
+    - `5651` - Family clothing stores
+    - `5691` - Men's and women's clothing stores
+    - `5699` - Miscellaneous apparel and accessory shops
+  </Accordion>
+</AccordionGroup>
+
+## Updating Spending Controls
+
+You can upgrade an existing card from default to smart, or modify MCC routing:
+
+```typescript
+// Upgrade existing card to smart spending
+const upgraded = await user.accounts.card.updateMetadata({
+  urn: cardUrn,
+  metadata: {
+    spending_control: 'smart',
+    mcc_whitelist: {
+      [foodPocket.urn]: ['5411', '5812', '5814'],
+    },
+    priority_mcc: [foodPocket.urn, mainWallet.urn],
+  },
+});
+```
+
+<Warning>
+When updating metadata, you must send the **full configuration**, not a partial update. Include all pockets and MCCs you want to maintain.
+</Warning>
+
+### Adding a New Category
+
+```typescript
+// Create entertainment pocket
+const entertainmentPocket = await user.accounts.virtual.create(
+  { name: 'Entertainment' },
+  { waitLedger: true },
+);
+
+// Update card with new category
+const updated = await user.accounts.card.updateMetadata({
+  urn: cardUrn,
+  metadata: {
+    spending_control: 'smart',
+    mcc_whitelist: {
+      [foodPocket.urn]: ['5411', '5812', '5814'],
+      [entertainmentPocket.urn]: [
+        '7832', // Movies
+        '7841', // Streaming services
+        '7911', // Entertainment events
+      ],
+    },
+    priority_mcc: [
+      foodPocket.urn,
+      entertainmentPocket.urn,
+      mainWallet.urn,
+    ],
+  },
+});
+```
+
+## Fallback Behavior
+
+<Note>
+If a pocket runs out of funds, the transaction **falls through** to the next pocket in priority order.
+
+Example: If Food pocket is empty, a grocery purchase would try Transport (no match), then General (catch-all).
+</Note>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Put specific pockets first" icon="list-ol">
+    In `priority_mcc`, list category-specific pockets before the catch-all pocket.
+  </Card>
+  <Card title="Always have a catch-all" icon="shield">
+    Include one pocket without an MCC whitelist entry to handle unmatched transactions.
+  </Card>
+  <Card title="Test with small amounts" icon="flask">
+    Test MCC routing in sandbox mode before deploying to production.
+  </Card>
+  <Card title="Monitor pocket balances" icon="chart-line">
+    Set up webhooks to track balance changes and avoid declined transactions.
+  </Card>
+</CardGroup>
+
+## Related
+
+- [Card Accounts](/accounts/card) - Creating and managing cards
+- [Virtual Accounts](/accounts/virtual) - Working with pockets
+- [Transfers](/guides/transfers) - Moving funds between accounts
+- [Metadata](/guides/metadata) - Using metadata fields

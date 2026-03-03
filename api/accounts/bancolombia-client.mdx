@@ -1,0 +1,333 @@
+---
+title: BancolombiaClient
+description: API reference for BancolombiaClient methods
+---
+
+The `BancolombiaClient` provides methods to manage Bancolombia accounts.
+
+## create()
+
+Create a new Bancolombia account.
+
+```typescript
+await bloque.accounts.bancolombia.create(
+  params?: CreateBancolombiaAccountParams,
+  options?: CreateAccountOptions
+): Promise<BancolombiaAccount>
+```
+
+### Parameters
+
+<ParamField path="params" type="CreateBancolombiaAccountParams" optional>
+  Bancolombia account creation parameters
+  
+  <Expandable title="properties">
+    <ParamField path="name" type="string" optional>
+      Display name for the account
+    </ParamField>
+    
+    <ParamField path="ledgerId" type="string" optional>
+      Ledger account ID to associate with the Bancolombia account
+    </ParamField>
+    
+    <ParamField path="webhookUrl" type="string" optional>
+      Webhook URL to receive account events
+    </ParamField>
+    
+    <ParamField path="metadata" type="Record<string, unknown>" optional>
+      Custom metadata to attach to the Bancolombia account
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="options" type="CreateAccountOptions" optional>
+  Creation options
+  
+  <Expandable title="properties">
+    <ParamField path="waitLedger" type="boolean" optional>
+      Wait for account to become active before returning
+    </ParamField>
+    
+    <ParamField path="timeout" type="number" optional>
+      Timeout in milliseconds (default: 60000)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="BancolombiaAccount" type="object">
+  <Expandable title="properties">
+    <ResponseField name="urn" type="string">
+      Unique resource name for the Bancolombia account
+    </ResponseField>
+    
+    <ResponseField name="id" type="string">
+      Account ID
+    </ResponseField>
+    
+    <ResponseField name="referenceCode" type="string">
+      Reference code for the Bancolombia account
+    </ResponseField>
+    
+    <ResponseField name="status" type="'creation_in_progress' | 'active' | 'disabled' | 'frozen' | 'deleted' | 'creation_failed'">
+      Account status
+    </ResponseField>
+    
+    <ResponseField name="ownerUrn" type="string">
+      Owner URN
+    </ResponseField>
+    
+    <ResponseField name="ledgerId" type="string">
+      Ledger account ID associated with the account
+    </ResponseField>
+    
+    <ResponseField name="webhookUrl" type="string | null">
+      Webhook URL (if configured)
+    </ResponseField>
+    
+    <ResponseField name="metadata" type="Record<string, unknown>" optional>
+      Custom metadata
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      Creation timestamp
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      Last update timestamp
+    </ResponseField>
+    
+    <ResponseField name="balance" type="object" optional>
+      Token balances (optional, included in list responses and after creation)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```typescript
+// Create without waiting
+const account = await bloque.accounts.bancolombia.create({
+  name: 'Main Account'
+});
+
+// Create and wait for active status
+const account = await bloque.accounts.bancolombia.create({
+  name: 'Main Account'
+}, { waitLedger: true });
+```
+
+## list()
+
+List Bancolombia accounts.
+
+```typescript
+await bloque.accounts.bancolombia.list(
+  params?: ListBancolombiaAccountsParams
+): Promise<ListBancolombiaAccountsResult>
+```
+
+### Parameters
+
+<ParamField path="params" type="ListBancolombiaAccountsParams" optional>
+  List parameters
+  
+  <Expandable title="properties">
+    <ParamField path="urn" type="string" optional>
+      URN of a specific Bancolombia account to retrieve
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="ListBancolombiaAccountsResult" type="object">
+  <Expandable title="properties">
+    <ResponseField name="accounts" type="BancolombiaAccount[]">
+      Array of Bancolombia accounts with balance information
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```typescript
+// List all Bancolombia accounts
+const result = await bloque.accounts.bancolombia.list();
+
+// Get a specific Bancolombia account
+const result = await bloque.accounts.bancolombia.list({
+  urn: 'did:bloque:account:bancolombia:abc-123'
+});
+```
+
+## updateMetadata()
+
+Update Bancolombia account metadata.
+
+```typescript
+await bloque.accounts.bancolombia.updateMetadata(
+  params: UpdateBancolombiaMetadataParams
+): Promise<BancolombiaAccount>
+```
+
+### Parameters
+
+<ParamField path="params" type="UpdateBancolombiaMetadataParams">
+  Metadata update parameters
+  
+  <Expandable title="properties">
+    <ParamField path="urn" type="string" required>
+      URN of the Bancolombia account to update
+    </ParamField>
+    
+    <ParamField path="metadata" type="Record<string, unknown>" required>
+      Metadata to update (name and source are reserved fields and cannot be modified)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="BancolombiaAccount" type="object">
+  Updated Bancolombia account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.bancolombia.updateMetadata({
+  urn: 'did:bloque:mediums:bancolombia:account:123',
+  metadata: {
+    updated_by: 'admin',
+    update_reason: 'customer_request'
+  }
+});
+```
+
+## updateName()
+
+Update Bancolombia account name.
+
+```typescript
+await bloque.accounts.bancolombia.updateName(
+  urn: string,
+  name: string
+): Promise<BancolombiaAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  Bancolombia account URN
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  New name for the account
+</ParamField>
+
+### Returns
+
+<ResponseField name="BancolombiaAccount" type="object">
+  Updated Bancolombia account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.bancolombia.updateName(
+  'did:bloque:mediums:bancolombia:account:123',
+  'Main Business Account'
+);
+```
+
+## activate()
+
+Activate a Bancolombia account.
+
+```typescript
+await bloque.accounts.bancolombia.activate(
+  urn: string
+): Promise<BancolombiaAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  Bancolombia account URN
+</ParamField>
+
+### Returns
+
+<ResponseField name="BancolombiaAccount" type="object">
+  Updated Bancolombia account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.bancolombia.activate(
+  'did:bloque:mediums:bancolombia:account:123'
+);
+```
+
+## freeze()
+
+Freeze a Bancolombia account.
+
+```typescript
+await bloque.accounts.bancolombia.freeze(
+  urn: string
+): Promise<BancolombiaAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  Bancolombia account URN
+</ParamField>
+
+### Returns
+
+<ResponseField name="BancolombiaAccount" type="object">
+  Updated Bancolombia account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.bancolombia.freeze(
+  'did:bloque:mediums:bancolombia:account:123'
+);
+```
+
+## disable()
+
+Disable a Bancolombia account.
+
+```typescript
+await bloque.accounts.bancolombia.disable(
+  urn: string
+): Promise<BancolombiaAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  Bancolombia account URN
+</ParamField>
+
+### Returns
+
+<ResponseField name="BancolombiaAccount" type="object">
+  Updated Bancolombia account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.bancolombia.disable(
+  'did:bloque:mediums:bancolombia:account:123'
+);
+```

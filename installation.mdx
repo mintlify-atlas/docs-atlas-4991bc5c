@@ -1,0 +1,295 @@
+---
+title: 'Installation'
+description: 'Install the Bloque SDK in your JavaScript or TypeScript project'
+---
+
+## Installation
+
+The Bloque SDK is available as an npm package and can be installed using any modern JavaScript package manager.
+
+## Package Managers
+
+<CodeGroup>
+```bash npm
+npm install @bloque/sdk
+```
+
+```bash yarn
+yarn add @bloque/sdk
+```
+
+```bash pnpm
+pnpm add @bloque/sdk
+```
+
+```bash bun
+bun add @bloque/sdk
+```
+</CodeGroup>
+
+## Requirements
+
+### Runtime Support
+
+The SDK supports multiple JavaScript runtimes:
+
+- **Node.js** 22.x or higher
+- **Bun** 1.x or higher
+- **Deno** Latest version
+- **Browsers** Modern browsers with ES2020+ support
+- **React Native** Latest stable version
+
+<Note>
+  The SDK uses modern JavaScript features and requires ES2020+ support.
+</Note>
+
+### TypeScript
+
+While the SDK is written in TypeScript and includes full type definitions, TypeScript is optional for your project:
+
+- **TypeScript** 5.x or higher (recommended)
+- Type definitions are included automatically
+- Full IntelliSense support in VS Code and other editors
+
+## Monorepo Packages
+
+The Bloque SDK is a monorepo containing multiple packages. The main `@bloque/sdk` package aggregates all functionality, but you can also install individual packages if needed:
+
+- **[@bloque/sdk](https://www.npmjs.com/package/@bloque/sdk)** - Main SDK package (recommended)
+- **[@bloque/sdk-core](https://www.npmjs.com/package/@bloque/sdk-core)** - Core utilities and HTTP client
+- **[@bloque/sdk-accounts](https://www.npmjs.com/package/@bloque/sdk-accounts)** - Accounts and virtual cards API
+- **[@bloque/sdk-identity](https://www.npmjs.com/package/@bloque/sdk-identity)** - Identity and aliases API
+- **[@bloque/sdk-compliance](https://www.npmjs.com/package/@bloque/sdk-compliance)** - Compliance and KYC verification API
+- **[@bloque/sdk-orgs](https://www.npmjs.com/package/@bloque/sdk-orgs)** - Organizations API
+
+<Note>
+  For most use cases, install only `@bloque/sdk`. The individual packages are primarily for advanced modular setups.
+</Note>
+
+## Version Pinning
+
+<Warning>
+  The SDK is under active development. We strongly recommend pinning to a specific version to avoid unexpected breaking changes.
+</Warning>
+
+In your `package.json`:
+
+```json package.json
+{
+  "dependencies": {
+    "@bloque/sdk": "0.0.43"
+  }
+}
+```
+
+Avoid using version ranges like `^0.0.43` or `~0.0.43` during the pre-1.0 phase.
+
+## Verifying Installation
+
+After installation, verify the SDK is working:
+
+<CodeGroup>
+```typescript TypeScript
+import { SDK } from '@bloque/sdk';
+
+console.log('Bloque SDK imported successfully!');
+```
+
+```javascript JavaScript (ESM)
+import { SDK } from '@bloque/sdk';
+
+console.log('Bloque SDK imported successfully!');
+```
+
+```javascript JavaScript (CommonJS)
+const { SDK } = require('@bloque/sdk');
+
+console.log('Bloque SDK imported successfully!');
+```
+</CodeGroup>
+
+## Platform-Specific Setup
+
+### Node.js
+
+No additional setup required. Node.js 22+ automatically loads `.env` files.
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  origin: process.env.BLOQUE_ORIGIN!,
+  auth: {
+    type: 'apiKey',
+    apiKey: process.env.BLOQUE_API_KEY!,
+  },
+  mode: 'production',
+  platform: 'node', // optional, auto-detected
+});
+```
+
+### Bun
+
+Bun automatically loads `.env` files without additional configuration:
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  origin: process.env.BLOQUE_ORIGIN!,
+  auth: {
+    type: 'apiKey',
+    apiKey: process.env.BLOQUE_API_KEY!,
+  },
+  mode: 'production',
+  platform: 'bun',
+});
+```
+
+### Deno
+
+Use npm specifiers or import maps:
+
+```typescript
+import { SDK } from 'npm:@bloque/sdk';
+
+const bloque = new SDK({
+  origin: Deno.env.get('BLOQUE_ORIGIN')!,
+  auth: {
+    type: 'apiKey',
+    apiKey: Deno.env.get('BLOQUE_API_KEY')!,
+  },
+  mode: 'production',
+  platform: 'deno',
+});
+```
+
+### Browser
+
+For browser environments, use JWT authentication instead of API keys:
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  auth: {
+    type: 'jwt',
+  },
+  mode: 'production',
+  platform: 'browser',
+});
+
+// Authenticate with JWT
+const session = await bloque.authenticate();
+```
+
+<Warning>
+  Never expose API keys in browser code. Use JWT authentication for client-side applications.
+</Warning>
+
+### React Native
+
+Install the SDK and configure secure token storage:
+
+```bash
+npm install @bloque/sdk
+npm install @react-native-async-storage/async-storage
+```
+
+Implement token storage:
+
+```typescript
+import { SDK } from '@bloque/sdk';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const tokenStorage = {
+  get: async () => await AsyncStorage.getItem('bloque_token'),
+  set: async (token: string) => await AsyncStorage.setItem('bloque_token', token),
+  clear: async () => await AsyncStorage.removeItem('bloque_token'),
+};
+
+const bloque = new SDK({
+  auth: {
+    type: 'jwt',
+  },
+  mode: 'production',
+  platform: 'react-native',
+  tokenStorage,
+});
+```
+
+## Build Output
+
+The SDK ships with multiple module formats:
+
+- **ESM** (ES Modules): `dist/index.js` - For modern bundlers and Node.js
+- **CommonJS**: `dist/index.cjs` - For legacy Node.js require()
+- **TypeScript Declarations**: `dist/index.d.ts` - Full type definitions
+
+<Note>
+  Modern bundlers like Vite, Webpack 5+, and esbuild will automatically use the ESM version.
+</Note>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Module not found error">
+    Make sure you've installed the package:
+    ```bash
+    npm install @bloque/sdk
+    ```
+    
+    If using TypeScript, verify your `tsconfig.json` has `"moduleResolution": "bundler"` or `"node16"`.
+  </Accordion>
+
+  <Accordion title="Type errors with TypeScript">
+    Ensure you're using TypeScript 5.x or higher:
+    ```bash
+    npm install -D typescript@latest
+    ```
+  </Accordion>
+
+  <Accordion title="Runtime version errors">
+    Verify your Node.js version:
+    ```bash
+    node --version  # Should be 22.x or higher
+    ```
+    
+    Upgrade if needed:
+    ```bash
+    nvm install 22
+    nvm use 22
+    ```
+  </Accordion>
+
+  <Accordion title="Cannot find module '@bloque/sdk'">
+    This usually happens when:
+    - The package wasn't installed correctly
+    - Your `node_modules` folder is corrupted
+    
+    Solution:
+    ```bash
+    rm -rf node_modules package-lock.json
+    npm install
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get started with your first API call
+  </Card>
+  <Card
+    title="Authentication"
+    icon="key"
+    href="/authentication"
+  >
+    Learn about API keys and JWT authentication
+  </Card>
+</CardGroup>

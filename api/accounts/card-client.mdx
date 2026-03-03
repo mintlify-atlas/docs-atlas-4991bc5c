@@ -1,0 +1,480 @@
+---
+title: CardClient
+description: API reference for CardClient methods
+---
+
+The `CardClient` provides methods to manage card accounts.
+
+## create()
+
+Create a new card account.
+
+```typescript
+await bloque.accounts.card.create(
+  params?: CreateCardParams,
+  options?: CreateAccountOptions
+): Promise<CardAccount>
+```
+
+### Parameters
+
+<ParamField path="params" type="CreateCardParams" optional>
+  Card creation parameters
+  
+  <Expandable title="properties">
+    <ParamField path="name" type="string" optional>
+      Display name for the card
+    </ParamField>
+    
+    <ParamField path="webhookUrl" type="string" optional>
+      Webhook URL to receive card events
+    </ParamField>
+    
+    <ParamField path="ledgerId" type="string" optional>
+      Ledger account ID to associate with the card
+    </ParamField>
+    
+    <ParamField path="metadata" type="Record<string, unknown>" optional>
+      Custom metadata to associate with the card
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="options" type="CreateAccountOptions" optional>
+  Creation options
+  
+  <Expandable title="properties">
+    <ParamField path="waitLedger" type="boolean" optional>
+      Wait for account to become active before returning
+    </ParamField>
+    
+    <ParamField path="timeout" type="number" optional>
+      Timeout in milliseconds (default: 60000)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="CardAccount" type="object">
+  <Expandable title="properties">
+    <ResponseField name="urn" type="string">
+      Unique resource name for the card account
+    </ResponseField>
+    
+    <ResponseField name="id" type="string">
+      Card account ID
+    </ResponseField>
+    
+    <ResponseField name="lastFour" type="string">
+      Last four digits of the card
+    </ResponseField>
+    
+    <ResponseField name="productType" type="'CREDIT' | 'DEBIT'">
+      Type of card product
+    </ResponseField>
+    
+    <ResponseField name="status" type="'active' | 'disabled' | 'frozen' | 'deleted' | 'creation_in_progress' | 'creation_failed'">
+      Current status of the card
+    </ResponseField>
+    
+    <ResponseField name="cardType" type="'VIRTUAL' | 'PHYSICAL'">
+      Type of card
+    </ResponseField>
+    
+    <ResponseField name="detailsUrl" type="string">
+      URL to view card details (PCI-compliant)
+    </ResponseField>
+    
+    <ResponseField name="ownerUrn" type="string">
+      Owner URN
+    </ResponseField>
+    
+    <ResponseField name="ledgerId" type="string">
+      Ledger account ID associated with the card
+    </ResponseField>
+    
+    <ResponseField name="webhookUrl" type="string | null">
+      Webhook URL (if configured)
+    </ResponseField>
+    
+    <ResponseField name="metadata" type="Record<string, unknown>" optional>
+      Custom metadata
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      Creation timestamp
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      Last update timestamp
+    </ResponseField>
+    
+    <ResponseField name="balance" type="Record<string, TokenBalance>" optional>
+      Token balances (only included in list responses)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```typescript
+// Create without waiting
+const card = await bloque.accounts.card.create({
+  name: 'My Card',
+});
+
+// Create and wait for active status
+const card = await bloque.accounts.card.create({
+  name: 'My Card',
+}, { waitLedger: true });
+```
+
+## list()
+
+List card accounts.
+
+```typescript
+await bloque.accounts.card.list(
+  params?: ListCardAccountsParams
+): Promise<ListCardAccountsResult>
+```
+
+### Parameters
+
+<ParamField path="params" type="ListCardAccountsParams" optional>
+  List parameters
+  
+  <Expandable title="properties">
+    <ParamField path="urn" type="string" optional>
+      URN of a specific card account to retrieve
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="ListCardAccountsResult" type="object">
+  <Expandable title="properties">
+    <ResponseField name="accounts" type="CardAccount[]">
+      Array of card accounts with balance information
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```typescript
+// List all card accounts
+const result = await bloque.accounts.card.list();
+
+// Get a specific card account
+const result = await bloque.accounts.card.list({
+  urn: 'did:bloque:account:card:usr-123:crd-456'
+});
+```
+
+## movements()
+
+List card account movements/transactions.
+
+```typescript
+await bloque.accounts.card.movements(
+  params: ListMovementsParams
+): Promise<ListMovementsPagedResult>
+```
+
+### Parameters
+
+<ParamField path="params" type="ListMovementsParams">
+  Movement list parameters
+  
+  <Expandable title="properties">
+    <ParamField path="urn" type="string" required>
+      URN of the card account
+    </ParamField>
+    
+    <ParamField path="asset" type="SupportedAsset" optional>
+      Asset to filter transactions by (defaults to "DUSD/6")
+    </ParamField>
+    
+    <ParamField path="limit" type="number" optional>
+      Maximum number of transactions to return
+    </ParamField>
+    
+    <ParamField path="before" type="string" optional>
+      Filter transactions before this date (ISO 8601)
+    </ParamField>
+    
+    <ParamField path="after" type="string" optional>
+      Filter transactions after this date (ISO 8601)
+    </ParamField>
+    
+    <ParamField path="reference" type="string" optional>
+      Filter by transaction reference
+    </ParamField>
+    
+    <ParamField path="direction" type="'in' | 'out'" optional>
+      Filter by transaction direction ('in' for deposits, 'out' for withdrawals)
+    </ParamField>
+    
+    <ParamField path="collapsed_view" type="boolean" optional>
+      Returns a collapsed view of movements (grouped or summarized)
+    </ParamField>
+    
+    <ParamField path="pocket" type="'main' | 'pending'" optional>
+      Filter by pocket ('main' for confirmed, 'pending' for pending movements)
+    </ParamField>
+    
+    <ParamField path="next" type="string" optional>
+      Pagination token for fetching the next page
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="ListMovementsPagedResult" type="object">
+  <Expandable title="properties">
+    <ResponseField name="data" type="CardMovement[]">
+      Array of movements
+    </ResponseField>
+    
+    <ResponseField name="pageSize" type="number">
+      Number of results in this page
+    </ResponseField>
+    
+    <ResponseField name="hasMore" type="boolean">
+      Whether more results are available
+    </ResponseField>
+    
+    <ResponseField name="next" type="string" optional>
+      Pagination token for the next page (if hasMore is true)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```typescript
+// Basic usage
+const { data, pageSize, hasMore, next } = await bloque.accounts.card.movements({
+  urn: 'did:bloque:account:card:usr-123:crd-456',
+  asset: 'DUSD/6',
+});
+
+// With pagination and filters
+const result = await bloque.accounts.card.movements({
+  urn: 'did:bloque:account:card:usr-123:crd-456',
+  asset: 'DUSD/6',
+  limit: 50,
+  direction: 'in',
+  after: '2025-01-01T00:00:00Z',
+});
+```
+
+## balance()
+
+Get card account balance.
+
+```typescript
+await bloque.accounts.card.balance(
+  params: GetBalanceParams
+): Promise<Record<string, TokenBalance>>
+```
+
+### Parameters
+
+<ParamField path="params" type="GetBalanceParams">
+  Balance query parameters
+  
+  <Expandable title="properties">
+    <ParamField path="urn" type="string" required>
+      URN of the card account
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="Record<string, TokenBalance>" type="object">
+  Token balances keyed by asset
+</ResponseField>
+
+### Example
+
+```typescript
+const balances = await bloque.accounts.card.balance({
+  urn: 'did:bloque:account:card:usr-123:crd-456',
+});
+```
+
+## updateMetadata()
+
+Update card account metadata.
+
+```typescript
+await bloque.accounts.card.updateMetadata(
+  params: UpdateCardMetadataParams
+): Promise<CardAccount>
+```
+
+### Parameters
+
+<ParamField path="params" type="UpdateCardMetadataParams">
+  Metadata update parameters
+  
+  <Expandable title="properties">
+    <ParamField path="urn" type="string" required>
+      URN of the card account to update
+    </ParamField>
+    
+    <ParamField path="metadata" type="Record<string, unknown>" required>
+      Metadata to update (name and source are reserved fields and cannot be modified)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="CardAccount" type="object">
+  Updated card account
+</ResponseField>
+
+### Example
+
+```typescript
+const card = await bloque.accounts.card.updateMetadata({
+  urn: 'did:bloque:mediums:card:account:123',
+  metadata: {
+    updated_by: 'admin',
+    update_reason: 'customer_request'
+  }
+});
+```
+
+## updateName()
+
+Update card account name.
+
+```typescript
+await bloque.accounts.card.updateName(
+  urn: string,
+  name: string
+): Promise<CardAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  Card account URN
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  New name for the card
+</ParamField>
+
+### Returns
+
+<ResponseField name="CardAccount" type="object">
+  Updated card account
+</ResponseField>
+
+### Example
+
+```typescript
+const card = await bloque.accounts.card.updateName(
+  'did:bloque:mediums:card:account:123',
+  'My Business Card'
+);
+```
+
+## activate()
+
+Activate a card account.
+
+```typescript
+await bloque.accounts.card.activate(
+  urn: string
+): Promise<CardAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  Card account URN
+</ParamField>
+
+### Returns
+
+<ResponseField name="CardAccount" type="object">
+  Updated card account
+</ResponseField>
+
+### Example
+
+```typescript
+const card = await bloque.accounts.card.activate(
+  'did:bloque:mediums:card:account:123'
+);
+```
+
+## freeze()
+
+Freeze a card account.
+
+```typescript
+await bloque.accounts.card.freeze(
+  urn: string
+): Promise<CardAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  Card account URN
+</ParamField>
+
+### Returns
+
+<ResponseField name="CardAccount" type="object">
+  Updated card account
+</ResponseField>
+
+### Example
+
+```typescript
+const card = await bloque.accounts.card.freeze(
+  'did:bloque:mediums:card:account:123'
+);
+```
+
+## disable()
+
+Disable a card account.
+
+```typescript
+await bloque.accounts.card.disable(
+  urn: string
+): Promise<CardAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  Card account URN
+</ParamField>
+
+### Returns
+
+<ResponseField name="CardAccount" type="object">
+  Updated card account
+</ResponseField>
+
+### Example
+
+```typescript
+const card = await bloque.accounts.card.disable(
+  'did:bloque:mediums:card:account:123'
+);
+```

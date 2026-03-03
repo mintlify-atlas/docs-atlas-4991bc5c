@@ -1,0 +1,452 @@
+---
+title: 'Polygon Blockchain Wallets'
+description: 'Create and manage Polygon blockchain wallets with PolygonClient'
+---
+
+## Overview
+
+The PolygonClient provides methods for creating and managing cryptocurrency wallets on the Polygon blockchain network. These wallets can hold digital assets and be linked to other account types for seamless crypto-to-fiat conversion.
+
+## Accessing PolygonClient
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  auth: {
+    type: 'apiKey',
+    apiKey: process.env.BLOQUE_API_KEY,
+  },
+});
+
+const user = await bloque.connect('@username');
+const polygonClient = user.accounts.polygon;
+```
+
+## Creating Polygon Wallets
+
+### Basic Creation
+
+```typescript
+const wallet = await user.accounts.polygon.create();
+
+console.log(wallet.urn);
+console.log(wallet.address);
+console.log(wallet.network); // 'polygon'
+console.log(wallet.status);  // 'creation_in_progress'
+```
+
+### Wait for Active Status
+
+Use the `waitLedger` option to wait for the wallet to become active:
+
+```typescript
+const wallet = await user.accounts.polygon.create(
+  {},
+  { waitLedger: true }
+);
+
+console.log(wallet.status);  // 'active'
+console.log(wallet.address); // Polygon wallet address (0x...)
+console.log(wallet.balance);
+```
+
+### Create with Name
+
+```typescript
+const wallet = await user.accounts.polygon.create({
+  name: 'My Crypto Wallet',
+});
+```
+
+### Create with Metadata
+
+```typescript
+const wallet = await user.accounts.polygon.create({
+  name: 'Trading Wallet',
+  metadata: {
+    purpose: 'trading',
+    strategy: 'long-term',
+  },
+});
+```
+
+### Link to Existing Ledger
+
+Share a ledger account with other accounts (creates a "pocket"):
+
+```typescript
+// Create virtual account first
+const virtual = await user.accounts.virtual.create({}, { waitLedger: true });
+
+// Create Polygon wallet linked to same ledger
+const polygon = await user.accounts.polygon.create(
+  {
+    ledgerId: virtual.ledgerId,
+  },
+  { waitLedger: true }
+);
+
+// Create card linked to same ledger
+const card = await user.accounts.card.create(
+  {
+    ledgerId: virtual.ledgerId,
+    name: 'Crypto Card',
+  },
+  { waitLedger: true }
+);
+
+// Now you can:
+// 1. Receive crypto in the Polygon wallet
+// 2. Automatically convert to fiat
+// 3. Spend with the card
+```
+
+<Note>
+Linking a Polygon wallet to a card creates a powerful crypto-to-fiat spending solution.
+</Note>
+
+## Listing Polygon Wallets
+
+### List All Wallets
+
+```typescript
+const { accounts } = await user.accounts.polygon.list();
+
+accounts.forEach(wallet => {
+  console.log(wallet.urn);
+  console.log(wallet.address);
+  console.log(wallet.network);
+  console.log(wallet.status);
+  console.log(wallet.balance);
+});
+```
+
+### Get Specific Wallet
+
+```typescript
+const { accounts } = await user.accounts.polygon.list({
+  urn: 'did:bloque:account:polygon:0x05B10c9B6241b73fc8c906fB7979eFc7764AB731'
+});
+
+const wallet = accounts[0];
+```
+
+## Polygon Account Details
+
+The `PolygonAccount` type includes:
+
+<ResponseField name="urn" type="string" required>
+  Unique resource name for the Polygon account
+</ResponseField>
+
+<ResponseField name="id" type="string" required>
+  Account ID
+</ResponseField>
+
+<ResponseField name="address" type="string" required>
+  Polygon wallet address (0x...)
+</ResponseField>
+
+<ResponseField name="network" type="string" required>
+  Network name (always "polygon")
+</ResponseField>
+
+<ResponseField name="status" type="AccountStatus" required>
+  Current status: `creation_in_progress`, `active`, `disabled`, `frozen`, `deleted`, or `creation_failed`
+</ResponseField>
+
+<ResponseField name="ownerUrn" type="string" required>
+  URN of the account owner
+</ResponseField>
+
+<ResponseField name="ledgerId" type="string" required>
+  Ledger account ID associated with the Polygon account
+</ResponseField>
+
+<ResponseField name="webhookUrl" type="string | null">
+  Webhook URL for account events (if configured)
+</ResponseField>
+
+<ResponseField name="metadata" type="Record<string, string>">
+  Custom metadata attached to the account (all values must be strings)
+</ResponseField>
+
+<ResponseField name="balance" type="Record<string, TokenBalance>">
+  Token balances by asset (included in list responses and after creation)
+</ResponseField>
+
+## Managing Polygon Wallets
+
+### Update Metadata
+
+```typescript
+const wallet = await user.accounts.polygon.updateMetadata({
+  urn: 'did:bloque:account:polygon:0x05B10c9B6241b73fc8c906fB7979eFc7764AB731',
+  metadata: {
+    updated_by: 'admin',
+    update_reason: 'testing_update',
+  },
+});
+```
+
+<Warning>
+The `source` field is reserved and cannot be modified through `updateMetadata`.
+</Warning>
+
+### Activate Wallet
+
+```typescript
+const wallet = await user.accounts.polygon.activate(
+  'did:bloque:account:polygon:0x05B10c9B6241b73fc8c906fB7979eFc7764AB731'
+);
+
+console.log(wallet.status); // 'active'
+```
+
+### Freeze Wallet
+
+```typescript
+const wallet = await user.accounts.polygon.freeze(
+  'did:bloque:account:polygon:0x05B10c9B6241b73fc8c906fB7979eFc7764AB731'
+);
+
+console.log(wallet.status); // 'frozen'
+```
+
+### Disable Wallet
+
+```typescript
+const wallet = await user.accounts.polygon.disable(
+  'did:bloque:account:polygon:0x05B10c9B6241b73fc8c906fB7979eFc7764AB731'
+);
+
+console.log(wallet.status); // 'disabled'
+```
+
+## Using Polygon Wallets
+
+### Check Balance
+
+Use the general `accounts.balance()` method:
+
+```typescript
+const balance = await user.accounts.balance(
+  'did:bloque:account:polygon:0x05B10c9B6241b73fc8c906fB7979eFc7764AB731'
+);
+
+Object.entries(balance).forEach(([asset, b]) => {
+  console.log(`${asset}:`);
+  console.log(`  Current: ${b.current}`);
+  console.log(`  Pending: ${b.pending}`);
+  console.log(`  In: ${b.in}`);
+  console.log(`  Out: ${b.out}`);
+});
+```
+
+### Transfer Funds
+
+```typescript
+// Transfer from Polygon wallet to virtual account
+const transfer = await user.accounts.transfer({
+  sourceUrn: 'did:bloque:account:polygon:0x05B10c9B6241b73fc8c906fB7979eFc7764AB731',
+  destinationUrn: 'did:bloque:account:virtual:acc-12345',
+  amount: '1000000000000',
+  asset: 'KSM/12',
+});
+```
+
+### View Transaction History
+
+```typescript
+const { data, hasMore, next } = await user.accounts.movements({
+  urn: 'did:bloque:account:polygon:0x05B10c9B6241b73fc8c906fB7979eFc7764AB731',
+  asset: 'KSM/12',
+  limit: 50,
+});
+
+data.forEach(movement => {
+  console.log(movement.type);      // 'deposit' | 'withdraw' | 'transfer'
+  console.log(movement.amount);
+  console.log(movement.direction); // 'in' | 'out'
+  console.log(movement.status);
+});
+```
+
+## Common Use Cases
+
+### Crypto-to-Fiat Spending
+
+Create a complete crypto spending solution:
+
+```typescript
+// 1. Create virtual account (the pocket)
+const pocket = await user.accounts.virtual.create({}, { waitLedger: true });
+
+// 2. Create Polygon wallet linked to pocket
+const polygon = await user.accounts.polygon.create(
+  {
+    ledgerId: pocket.ledgerId,
+    name: 'Crypto Deposits',
+  },
+  { waitLedger: true }
+);
+
+// 3. Create card linked to pocket
+const card = await user.accounts.card.create(
+  {
+    ledgerId: pocket.ledgerId,
+    name: 'Crypto Card',
+    metadata: {
+      preferred_asset: 'DUSD/6',
+      default_asset: 'DUSD/6',
+    },
+  },
+  { waitLedger: true }
+);
+
+console.log('Deposit crypto to:', polygon.address);
+console.log('Spend with card ending in:', card.lastFour);
+```
+
+### Multi-Wallet Management
+
+Organize multiple wallets for different purposes:
+
+```typescript
+// Trading wallet
+const tradingWallet = await user.accounts.polygon.create({
+  name: 'Trading Wallet',
+  metadata: {
+    purpose: 'trading',
+  },
+});
+
+// Long-term holdings wallet
+const holdingsWallet = await user.accounts.polygon.create({
+  name: 'Holdings Wallet',
+  metadata: {
+    purpose: 'long-term',
+  },
+});
+
+// List all wallets
+const { accounts } = await user.accounts.polygon.list();
+```
+
+### Webhook Notifications
+
+Receive real-time notifications for wallet activity:
+
+```typescript
+const wallet = await user.accounts.polygon.create({
+  name: 'Monitored Wallet',
+  webhookUrl: 'https://api.example.com/webhooks/polygon-events',
+});
+
+// Your webhook will receive events for:
+// - Incoming deposits
+// - Outgoing transfers
+// - Balance changes
+// - Status updates
+```
+
+## Receiving Crypto Deposits
+
+Once you create a Polygon wallet, you can receive crypto deposits:
+
+```typescript
+const wallet = await user.accounts.polygon.create({}, { waitLedger: true });
+
+console.log('Send crypto to:', wallet.address);
+
+// Monitor for deposits
+const { data } = await user.accounts.movements({
+  urn: wallet.urn,
+  asset: 'KSM/12',
+  direction: 'in',
+});
+
+data.forEach(deposit => {
+  if (deposit.status === 'settled') {
+    console.log('Received', deposit.amount, deposit.asset);
+  }
+});
+```
+
+## API Reference
+
+### create()
+
+Create a new Polygon account.
+
+<ParamField path="params" type="CreatePolygonAccountParams">
+  <ParamField path="name" type="string">
+    Display name for the Polygon account
+  </ParamField>
+  <ParamField path="ledgerId" type="string">
+    Ledger account ID to associate with the Polygon account. If not provided, a new ledger account will be created automatically.
+  </ParamField>
+  <ParamField path="webhookUrl" type="string">
+    Webhook URL to receive account events
+  </ParamField>
+  <ParamField path="metadata" type="Record<string, string>">
+    Custom metadata to attach to the Polygon account (all values must be strings)
+  </ParamField>
+</ParamField>
+
+<ParamField path="options" type="CreateAccountOptions">
+  <ParamField path="waitLedger" type="boolean" default={false}>
+    If true, wait for the account to become active before returning
+  </ParamField>
+  <ParamField path="timeout" type="number" default={60000}>
+    Maximum time to wait in milliseconds (only applies when waitLedger is true)
+  </ParamField>
+</ParamField>
+
+### list()
+
+List Polygon accounts.
+
+<ParamField path="params" type="ListPolygonAccountsParams">
+  <ParamField path="urn" type="string">
+    URN of a specific Polygon account to retrieve
+  </ParamField>
+</ParamField>
+
+### updateMetadata()
+
+Update Polygon account metadata.
+
+<ParamField path="params" type="UpdatePolygonMetadataParams" required>
+  <ParamField path="urn" type="string" required>
+    URN of the Polygon account to update
+  </ParamField>
+  <ParamField path="metadata" type="Record<string, string>" required>
+    Metadata to update (source is reserved)
+  </ParamField>
+</ParamField>
+
+### activate()
+
+Activate a Polygon account.
+
+<ParamField path="urn" type="string" required>
+  Polygon account URN
+</ParamField>
+
+### freeze()
+
+Freeze a Polygon account.
+
+<ParamField path="urn" type="string" required>
+  Polygon account URN
+</ParamField>
+
+### disable()
+
+Disable a Polygon account.
+
+<ParamField path="urn" type="string" required>
+  Polygon account URN
+</ParamField>

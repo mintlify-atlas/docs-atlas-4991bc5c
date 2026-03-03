@@ -1,0 +1,142 @@
+---
+title: 'Bloque SDK'
+description: 'Official TypeScript/JavaScript SDK for building financial applications with virtual accounts, cards, and blockchain integration'
+---
+
+## Welcome to Bloque SDK
+
+The Bloque SDK is a powerful TypeScript/JavaScript library that enables you to build modern financial applications with virtual accounts, payment cards, cryptocurrency wallets, and compliance features. Built for developers who need production-ready fintech infrastructure.
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get up and running in under 5 minutes with your first API call
+  </Card>
+  <Card
+    title="Installation"
+    icon="download"
+    href="/installation"
+  >
+    Install the SDK with npm, yarn, pnpm, or bun
+  </Card>
+  <Card
+    title="Authentication"
+    icon="key"
+    href="/authentication"
+  >
+    Learn about API key and JWT authentication methods
+  </Card>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api/sdk"
+  >
+    Explore the complete API documentation
+  </Card>
+</CardGroup>
+
+## Platform Support
+
+The Bloque SDK works across multiple JavaScript runtimes:
+
+- **Node.js** 22.x or higher
+- **Bun** 1.x or higher
+- **Deno** Latest version
+- **Web/Browsers** Modern browsers with ES2020+ support
+- **React Native** iOS and Android applications
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Virtual Accounts" icon="wallet">
+    Create and manage virtual accounts with multi-currency support
+  </Card>
+  <Card title="Payment Cards" icon="credit-card">
+    Issue virtual cards with spending controls and real-time transaction routing
+  </Card>
+  <Card title="Blockchain Integration" icon="link">
+    Connect to Polygon wallets and manage crypto assets
+  </Card>
+  <Card title="Compliance & KYC" icon="shield-check">
+    Built-in identity verification and compliance workflows
+  </Card>
+  <Card title="Organizations" icon="building">
+    Manage business entities and organizational structures
+  </Card>
+  <Card title="Multi-Platform" icon="devices">
+    Works in Node.js, Bun, Deno, browsers, and React Native
+  </Card>
+</CardGroup>
+
+## Quick Example
+
+Here's a taste of what you can build with the Bloque SDK:
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  origin: 'your-origin',
+  auth: {
+    type: 'apiKey',
+    apiKey: process.env.BLOQUE_API_KEY!,
+  },
+  mode: 'production',
+});
+
+// Connect to a user session
+const session = await bloque.connect('user-alias');
+
+// Create a virtual card
+const card = await session.accounts.card.create({
+  name: 'My Virtual Card',
+});
+
+console.log('Card created:', card.urn);
+console.log('Last four digits:', card.lastFour);
+```
+
+## Development Status
+
+<Warning>
+  This SDK is currently under active development. Breaking changes may occur between versions.
+  We strongly recommend pinning to a specific version in your `package.json` to avoid unexpected issues.
+</Warning>
+
+```json
+{
+  "dependencies": {
+    "@bloque/sdk": "0.0.43"
+  }
+}
+```
+
+## Getting Help
+
+Need assistance? Here are some resources:
+
+- [GitHub Repository](https://github.com/bloque-app/sdk) - Source code and examples
+- [Issue Tracker](https://github.com/bloque-app/sdk/issues) - Report bugs or request features
+- [Bloque Platform](https://www.bloque.app) - Learn more about the platform
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Get Started"
+    icon="play"
+    href="/quickstart"
+  >
+    Follow the quickstart guide to make your first API call
+  </Card>
+  <Card
+    title="Explore Guides"
+    icon="book"
+    href="/guides/transfers"
+  >
+    Browse practical guides and use cases
+  </Card>
+</CardGroup>

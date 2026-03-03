@@ -1,0 +1,204 @@
+---
+title: 'Swap & Exchange Overview'
+description: 'Exchange assets between different mediums using the Bloque Swap API'
+icon: 'arrows-rotate'
+---
+
+## Introduction
+
+The Bloque Swap SDK enables you to exchange assets between different payment mediums in Colombia. The SwapClient provides access to:
+
+- **Exchange rate discovery**: Find the best rates for asset pairs
+- **PSE integration**: Accept payments via Colombia's PSE (Pagos Seguros en Línea) system
+- **Bank transfers**: Cash out to any Colombian bank
+
+## SwapClient Architecture
+
+The SwapClient follows Bloque's BaseClient pattern with specialized sub-clients:
+
+```typescript
+const bloque = new SDK({
+  origin: process.env.ORIGIN,
+  auth: { type: 'apiKey', apiKey: process.env.API_KEY },
+  mode: 'sandbox',
+  platform: 'node'
+});
+
+const user = await bloque.connect('user-identifier');
+
+// Access swap functionality
+user.swap.findRates(...)         // Main swap client
+user.swap.pse.banks()            // PSE sub-client
+user.swap.bankTransfer.create()  // Bank transfer sub-client
+```
+
+## Sub-Clients
+
+<CardGroup cols={2}>
+  <Card title="PSE Client" icon="building-columns" href="/swap/pse">
+    Accept payments via Colombia's PSE payment system. List available banks and create PSE top-up orders.
+  </Card>
+  <Card title="Bank Transfer Client" icon="money-bill-transfer" href="/swap/bank-transfers">
+    Cash out to any Colombian bank. Supports 30+ banks with generic API.
+  </Card>
+</CardGroup>
+
+## Quick Example
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  origin: process.env.ORIGIN,
+  auth: { type: 'apiKey', apiKey: process.env.API_KEY },
+  mode: 'sandbox',
+  platform: 'node'
+});
+
+const user = await bloque.connect('nestor');
+
+// 1. Find exchange rates
+const rates = await user.swap.findRates({
+  fromAsset: 'COP/2',
+  toAsset: 'DUSD/6',
+  fromMediums: ['pse'],
+  toMediums: ['kusama'],
+  amountSrc: '10000000' // 100,000.00 COP
+});
+
+console.log('Best rate:', rates.rates[0].ratio);
+console.log('Fee:', rates.rates[0].fee.value);
+
+// 2. Create PSE order using the rate
+const order = await user.swap.pse.create({
+  rateSig: rates.rates[0].sig,
+  toMedium: 'kusama',
+  amountSrc: '10000000',
+  depositInformation: {
+    urn: 'did:bloque:account:card:usr-xxx:crd-xxx'
+  },
+  args: {
+    bankCode: '1',
+    userType: 0,
+    customerEmail: 'user@example.com',
+    userLegalIdType: 'CC',
+    userLegalId: '1234567890',
+    customerData: {
+      fullName: 'John Doe',
+      phoneNumber: '3001234567'
+    }
+  }
+});
+
+// 3. Redirect user to complete payment
+if (order.execution?.result.how?.url) {
+  console.log('Redirect to:', order.execution.result.how.url);
+}
+```
+
+## Asset Notation
+
+Assets in the Bloque system use precision notation:
+
+- Format: `{ASSET}/{DECIMALS}`
+- Example: `COP/2` means Colombian Peso with 2 decimal places
+- Example: `DUSD/6` means DUSD stablecoin with 6 decimal places
+
+### Amounts as BigInt Strings
+
+All amounts are passed as strings representing scaled integers:
+
+```typescript
+// COP/2 (2 decimals)
+'10000000' = 100,000.00 COP
+'1000000'  = 10,000.00 COP
+'50000'    = 500.00 COP
+
+// DUSD/6 (6 decimals)
+'1000000'  = 1.000000 DUSD
+'500000'   = 0.500000 DUSD
+```
+
+<Note>
+Always scale amounts by the asset's precision. For `COP/2`, multiply by 100. For `DUSD/6`, multiply by 1,000,000.
+</Note>
+
+## Payment Mediums
+
+Mediums represent different payment rails:
+
+### Source Mediums (fromMediums)
+- `pse` - PSE (Pagos Seguros en Línea)
+- `bancolombia` - Bancolombia transfers
+- `nequi` - Nequi wallet
+- `kusama` - Kusama blockchain
+
+### Destination Mediums (toMediums)
+- `kusama` - Kusama blockchain (for PSE top-ups)
+- `bancolombia` - Bancolombia (for cash-outs)
+- `banco_de_bogota` - Banco de Bogotá
+- `banco_davivienda` - Davivienda
+- See [Bank Transfers](/swap/bank-transfers) for full list
+
+## Order Types
+
+Swap orders support two types:
+
+<ParamField path="type" type="OrderType" default="src">
+  - `src`: Specify exact source amount (you pay exactly 100,000 COP)
+  - `dst`: Specify exact destination amount (you receive exactly 1 DUSD)
+</ParamField>
+
+```typescript
+// Source order: I want to pay exactly 100,000 COP
+await user.swap.pse.create({
+  type: 'src',
+  amountSrc: '10000000', // Exactly 100,000.00 COP
+  // destination amount calculated from rate
+});
+
+// Destination order: I want to receive exactly 1 DUSD
+await user.swap.pse.create({
+  type: 'dst',
+  amountDst: '1000000', // Exactly 1.000000 DUSD
+  // source amount calculated from rate
+});
+```
+
+## Error Handling
+
+All swap operations may throw Bloque errors:
+
+```typescript
+import { 
+  BloqueAPIError,
+  BloqueValidationError,
+  BloqueInsufficientFundsError 
+} from '@bloque/sdk';
+
+try {
+  const order = await user.swap.pse.create(params);
+} catch (error) {
+  if (error instanceof BloqueValidationError) {
+    console.error('Invalid params:', error.message);
+  } else if (error instanceof BloqueInsufficientFundsError) {
+    console.error('Insufficient funds');
+  } else if (error instanceof BloqueAPIError) {
+    console.error('API error:', error.requestId);
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Find Rates" icon="chart-line" href="/swap/rates">
+    Learn how to discover and compare exchange rates
+  </Card>
+  <Card title="PSE Integration" icon="building-columns" href="/swap/pse">
+    Accept payments via Colombia's PSE system
+  </Card>
+  <Card title="Bank Transfers" icon="money-bill-transfer" href="/swap/bank-transfers">
+    Cash out to Colombian banks
+  </Card>
+</CardGroup>

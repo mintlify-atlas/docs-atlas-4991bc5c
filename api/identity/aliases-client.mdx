@@ -1,0 +1,174 @@
+---
+title: 'AliasesClient'
+description: 'Client for managing identity aliases like phone numbers and email addresses'
+---
+
+## Overview
+
+The `AliasesClient` allows you to retrieve and manage aliases associated with identities. Aliases are alternative identifiers like phone numbers, email addresses, or blockchain addresses that can be used to look up an identity.
+
+```typescript
+import { BloqueSDK } from '@bloque/sdk';
+
+const bloque = await BloqueSDK.connect({
+  apiKey: 'your-api-key',
+  platform: 'node'
+});
+
+// Access aliases client
+const aliases = bloque.identity.aliases;
+```
+
+## Methods
+
+### get()
+
+Retrieve detailed information about a specific alias.
+
+```typescript
+const alias = await bloque.identity.aliases.get('+1234567890');
+console.log(alias.urn); // Identity URN
+console.log(alias.type); // "phone"
+console.log(alias.status); // "active"
+```
+
+#### Parameters
+
+<ParamField path="alias" type="string" required>
+  The alias to look up (phone number, email address, or other identifier)
+  
+  Examples:
+  - Phone: `"+1234567890"`
+  - Email: `"user@example.com"`
+  - Blockchain: `"0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6"`
+</ParamField>
+
+#### Returns
+
+<ResponseField name="id" type="string" required>
+  Unique identifier for this alias record
+</ResponseField>
+
+<ResponseField name="alias" type="string" required>
+  The alias value (phone number, email, etc.)
+</ResponseField>
+
+<ResponseField name="type" type="string" required>
+  Type of alias
+  
+  Common values:
+  - `"phone"` - Phone number
+  - `"email"` - Email address
+  - Custom types for other identifiers
+</ResponseField>
+
+<ResponseField name="urn" type="string" required>
+  URN of the identity associated with this alias
+</ResponseField>
+
+<ResponseField name="origin" type="string" required>
+  Origin namespace where this alias was registered
+</ResponseField>
+
+<ResponseField name="status" type="'active' | 'inactive' | 'revoked'" required>
+  Current status of the alias
+  
+  - `active` - Alias is valid and can be used
+  - `inactive` - Alias is temporarily disabled
+  - `revoked` - Alias has been permanently revoked
+</ResponseField>
+
+<ResponseField name="is_public" type="boolean" required>
+  Whether this alias is publicly visible
+</ResponseField>
+
+<ResponseField name="is_primary" type="boolean" required>
+  Whether this is the primary alias for the identity
+</ResponseField>
+
+<ResponseField name="details" type="object" required>
+  Additional details specific to the alias type
+  
+  <Expandable title="Details Fields">
+    <ResponseField name="phone" type="string">
+      Formatted phone number (for phone aliases)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="metadata" type="object" required>
+  Metadata associated with the alias
+  
+  <Expandable title="Metadata Fields">
+    <ResponseField name="alias" type="string" required>
+      The alias value (duplicated for convenience)
+    </ResponseField>
+    
+    Additional custom fields may be present depending on the alias type.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="created_at" type="string" required>
+  ISO 8601 timestamp when the alias was created
+</ResponseField>
+
+<ResponseField name="updated_at" type="string" required>
+  ISO 8601 timestamp when the alias was last updated
+</ResponseField>
+
+#### Example Response
+
+```json
+{
+  "id": "alias_abc123",
+  "alias": "+1234567890",
+  "type": "phone",
+  "urn": "did:bloque:origin:whatsapp:+1234567890",
+  "origin": "bloque-whatsapp",
+  "status": "active",
+  "is_public": true,
+  "is_primary": true,
+  "details": {
+    "phone": "+1 (234) 567-890"
+  },
+  "metadata": {
+    "alias": "+1234567890"
+  },
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+
+## Use Cases
+
+### Lookup User by Phone
+
+```typescript
+try {
+  const alias = await bloque.identity.aliases.get('+1234567890');
+  console.log(`Found user: ${alias.urn}`);
+  console.log(`Status: ${alias.status}`);
+} catch (error) {
+  console.error('Alias not found');
+}
+```
+
+### Verify Email Alias
+
+```typescript
+const emailAlias = await bloque.identity.aliases.get('user@example.com');
+
+if (emailAlias.status === 'active' && emailAlias.is_primary) {
+  console.log('Primary email verified');
+}
+```
+
+### Check Blockchain Address
+
+```typescript
+const address = '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6';
+const blockchainAlias = await bloque.identity.aliases.get(address);
+
+console.log(`Blockchain identity: ${blockchainAlias.urn}`);
+console.log(`Origin: ${blockchainAlias.origin}`);
+```

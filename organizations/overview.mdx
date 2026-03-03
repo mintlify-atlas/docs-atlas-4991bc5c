@@ -1,0 +1,363 @@
+---
+title: Organizations
+description: Manage business organizations and their profiles in the Bloque platform
+---
+
+## Overview
+
+The Organizations module enables you to create and manage business entities within the Bloque platform. Organizations can hold accounts, manage transactions, and represent legal business entities with full KYB (Know Your Business) compliance.
+
+## What is an Organization?
+
+An organization represents a business entity such as:
+- Corporations (C-Corp, S-Corp)
+- Limited Liability Companies (LLC)
+- Partnerships
+- Sole Proprietorships
+- Non-profit organizations
+
+## Organizations Client
+
+Access organization functionality through the SDK:
+
+```typescript
+const orgs = bloque.orgs;
+```
+
+## Organization Structure
+
+```typescript orgs/src/internal/wire-types.ts
+interface Organization {
+  urn: string;                              // Unique organization URN
+  org_type: 'business' | 'individual';      // Organization type
+  profile: OrgProfile;                      // Organization profile
+  metadata?: Record<string, unknown>;       // Custom metadata
+  status: OrgStatus;                        // Current status
+}
+```
+
+### Organization Status
+
+```typescript orgs/src/internal/wire-types.ts
+type OrgStatus =
+  | 'awaiting_compliance_verification'  // Pending KYB verification
+  | 'active'                            // Verified and active
+  | 'suspended'                         // Temporarily suspended
+  | 'closed';                           // Permanently closed
+```
+
+### Organization Types
+
+```typescript orgs/src/internal/wire-types.ts
+type OrgType = 'business' | 'individual';
+```
+
+- **business** - Corporate entity (LLC, Corp, etc.)
+- **individual** - Sole proprietorship or individual trader
+
+## Organization Profile
+
+Detailed business information:
+
+```typescript orgs/src/internal/wire-types.ts
+interface OrgProfile {
+  // Required fields
+  legal_name: string;                       // Official registered name
+  tax_id: string;                           // Tax ID (EIN, VAT, etc.)
+  incorporation_date: string;               // YYYY-MM-DD format
+  business_type: string;                    // LLC, Corp, Partnership, etc.
+  incorporation_country_code: string;       // ISO country code
+  address_line1: string;                    // Primary address
+  postal_code: string;
+  city: string;
+  
+  // Optional fields
+  incorporation_state?: string;             // State/province of incorporation
+  address_line2?: string;                   // Secondary address line
+  logo_url?: string;                        // URL to company logo
+  places?: Place[];                         // Additional locations
+}
+```
+
+## Create Organization
+
+```typescript orgs/src/internal/wire-types.ts
+interface CreateOrgParams {
+  org_type: OrgType;
+  profile: OrgProfile;
+  metadata?: Record<string, unknown>;
+}
+```
+
+### Example: Create Business Organization
+
+```typescript
+const organization = await bloque.orgs.create({
+  org_type: 'business',
+  profile: {
+    legal_name: 'Acme Corporation',
+    tax_id: '12-3456789',
+    incorporation_date: '2020-01-15',
+    business_type: 'LLC',
+    incorporation_country_code: 'US',
+    incorporation_state: 'DE',
+    address_line1: '123 Business Street',
+    address_line2: 'Suite 100',
+    city: 'New York',
+    postal_code: '10001',
+    logo_url: 'https://example.com/logo.png'
+  },
+  metadata: {
+    industry: 'Technology',
+    employeeCount: 50,
+    website: 'https://acme.com'
+  }
+});
+
+console.log('Organization URN:', organization.urn);
+console.log('Status:', organization.status);
+```
+
+### Example: Create Individual Organization
+
+```typescript
+const soloOrg = await bloque.orgs.create({
+  org_type: 'individual',
+  profile: {
+    legal_name: 'John Doe Consulting',
+    tax_id: '123-45-6789',
+    incorporation_date: '2022-06-01',
+    business_type: 'Sole Proprietorship',
+    incorporation_country_code: 'US',
+    address_line1: '456 Main St',
+    city: 'San Francisco',
+    postal_code: '94102'
+  }
+});
+
+console.log('Individual org created:', soloOrg.urn);
+```
+
+## Multiple Locations
+
+Organizations can have multiple physical locations:
+
+```typescript orgs/src/internal/wire-types.ts
+interface Place {
+  country_code: string;     // ISO country code
+  state: string;            // State/province
+  address_line1: string;    // Street address
+  postal_code: string;
+  city: string;
+  is_primary: boolean;      // Whether this is the primary location
+}
+```
+
+### Example: Organization with Multiple Locations
+
+```typescript
+const multiLocationOrg = await bloque.orgs.create({
+  org_type: 'business',
+  profile: {
+    legal_name: 'Global Tech Inc',
+    tax_id: '98-7654321',
+    incorporation_date: '2018-03-20',
+    business_type: 'Corporation',
+    incorporation_country_code: 'US',
+    address_line1: '100 HQ Boulevard',
+    city: 'Austin',
+    postal_code: '78701',
+    places: [
+      {
+        country_code: 'US',
+        state: 'TX',
+        address_line1: '100 HQ Boulevard',
+        city: 'Austin',
+        postal_code: '78701',
+        is_primary: true
+      },
+      {
+        country_code: 'US',
+        state: 'CA',
+        address_line1: '500 Market Street',
+        city: 'San Francisco',
+        postal_code: '94105',
+        is_primary: false
+      },
+      {
+        country_code: 'GB',
+        state: 'London',
+        address_line1: '10 Downing Street',
+        city: 'London',
+        postal_code: 'SW1A 2AA',
+        is_primary: false
+      }
+    ]
+  }
+});
+```
+
+## Organization Workflow
+
+<Steps>
+  <Step title="Create Organization">
+    Create the organization with business details:
+    
+    ```typescript
+    const org = await bloque.orgs.create({
+      org_type: 'business',
+      profile: orgProfile
+    });
+    ```
+  </Step>
+
+  <Step title="Verify Organization (KYB)">
+    Complete KYB verification (coming soon):
+    
+    ```typescript
+    // KYB verification will be similar to KYC
+    const verification = await bloque.compliance.kyb.startVerification({
+      urn: org.urn
+    });
+    ```
+  </Step>
+
+  <Step title="Check Status">
+    Monitor organization status:
+    
+    ```typescript
+    if (org.status === 'active') {
+      console.log('Organization is verified and active');
+    }
+    ```
+  </Step>
+
+  <Step title="Create Accounts">
+    Once active, create financial accounts for the organization:
+    
+    ```typescript
+    const account = await bloque.accounts.virtual.create({
+      holderUrn: org.urn,
+      currency: 'USD',
+      metadata: { purpose: 'Operating account' }
+    });
+    ```
+  </Step>
+</Steps>
+
+## Business Types
+
+Common business type values:
+
+- `LLC` - Limited Liability Company
+- `Corporation` - C-Corporation or S-Corporation
+- `Partnership` - General or Limited Partnership
+- `Sole Proprietorship` - Individual business owner
+- `Non-Profit` - 501(c)(3) or other non-profit
+- `Cooperative` - Member-owned cooperative
+
+## Date Formats
+
+Use ISO 8601 date format (YYYY-MM-DD) for all date fields:
+
+```typescript
+{
+  incorporation_date: '2020-01-15'  // January 15, 2020
+}
+```
+
+## Custom Metadata
+
+Store additional information in the metadata field:
+
+```typescript
+const org = await bloque.orgs.create({
+  org_type: 'business',
+  profile: orgProfile,
+  metadata: {
+    industry: 'Financial Services',
+    employeeCount: 150,
+    annualRevenue: 5000000,
+    website: 'https://example.com',
+    description: 'Leading fintech company',
+    founded: '2020',
+    customerId: 'cust_12345'
+  }
+});
+```
+
+<Note>
+  Metadata can store any JSON-serializable data and is useful for tracking application-specific information.
+</Note>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Accurate Business Information">
+    Ensure all business information is accurate and matches official registration documents:
+    - Use exact legal name from incorporation papers
+    - Provide valid tax ID (EIN, VAT, etc.)
+    - Use correct incorporation date
+    - Match address with registered business address
+  </Accordion>
+
+  <Accordion title="Tax ID Format">
+    Use the appropriate tax ID format for your jurisdiction:
+    - US EIN: `12-3456789`
+    - UK VAT: `GB123456789`
+    - EU VAT: `DE123456789`
+    - Mexico RFC: `ABC123456XYZ`
+  </Accordion>
+
+  <Accordion title="Country Codes">
+    Always use ISO 3166-1 alpha-2 country codes:
+    - United States: `US`
+    - United Kingdom: `GB`
+    - Canada: `CA`
+    - Mexico: `MX`
+    - Germany: `DE`
+  </Accordion>
+
+  <Accordion title="Status Monitoring">
+    Check organization status before performing operations:
+    
+    ```typescript
+    if (org.status !== 'active') {
+      throw new Error('Organization must be active');
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  Organizations in `awaiting_compliance_verification` status may have limited functionality until KYB verification is completed.
+</Warning>
+
+## Error Handling
+
+```typescript
+import { BloqueValidationError } from '@bloque/sdk-core';
+
+try {
+  const org = await bloque.orgs.create({
+    org_type: 'business',
+    profile: orgProfile
+  });
+} catch (error) {
+  if (error instanceof BloqueValidationError) {
+    console.error('Invalid organization data:', error.message);
+    // Check validation errors and retry
+  }
+}
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Organization Management" icon="building" href="/organizations/management">
+    Learn about managing organizations
+  </Card>
+  <Card title="Accounts" icon="wallet" href="/accounts/overview">
+    Create accounts for organizations
+  </Card>
+</CardGroup>

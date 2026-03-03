@@ -1,0 +1,565 @@
+---
+title: 'Core Types'
+description: 'TypeScript types and interfaces for the Bloque SDK'
+---
+
+# Core Types
+
+Core TypeScript types and interfaces used throughout the Bloque SDK.
+
+## Configuration Types
+
+### BloqueSDKConfig
+
+Public configuration object for the Bloque SDK. Used when initializing the SDK.
+
+```typescript
+type BloqueSDKConfig = ConfigWithBaseUrl | ConfigWithMode;
+```
+
+You can provide either a custom `baseUrl` **or** a `mode`, but not both.
+
+#### ConfigWithBaseUrl
+
+Use a custom API endpoint:
+
+<ResponseField name="baseUrl" type="string" required>
+  Custom base URL for the SDK. When provided, `mode` cannot be specified.
+</ResponseField>
+
+<ResponseField name="origin" type="string">
+  Origin identifier for the SDK. Used to scope requests to a specific origin within the Bloque platform.
+  
+  - Required for `apiKey` authentication
+  - Optional for `jwt` authentication (resolved during `authenticate()`)
+</ResponseField>
+
+<ResponseField name="platform" type="Platform">
+  Platform where the SDK is executed. Determines the runtime environment and its capabilities.
+  
+  - `node` (default): backend runtime (Node.js, Bun, Deno). Supports API key authentication.
+  - `browser`: web browser environment. Must use JWT authentication.
+  - `react-native`: React Native environment. Must use JWT authentication.
+  - `bun`: Bun runtime. Supports API key authentication.
+  - `deno`: Deno runtime. Supports API key authentication.
+</ResponseField>
+
+<ResponseField name="auth" type="AuthStrategy" required>
+  Authentication strategy used by the SDK.
+  
+  - `{ type: 'apiKey', apiKey: string }`: for backend platforms
+  - `{ type: 'jwt' }`: for frontend platforms
+</ResponseField>
+
+<ResponseField name="tokenStorage" type="TokenStorage">
+  JWT token storage strategy. See [TokenStorage](#tokenstorage) for details.
+</ResponseField>
+
+<ResponseField name="timeout" type="number">
+  Default timeout for HTTP requests in milliseconds.
+  
+  Default: `30000` (30 seconds)
+</ResponseField>
+
+<ResponseField name="retry" type="RetryConfig">
+  Retry configuration for failed requests. See [RetryConfig](#retryconfig) for details.
+</ResponseField>
+
+#### ConfigWithMode
+
+Use default production or sandbox endpoints:
+
+<ResponseField name="mode" type="Mode" required>
+  SDK operation mode:
+  - `'production'` (default): production environment with live data
+  - `'sandbox'`: sandbox environment with mock data for testing
+</ResponseField>
+
+All other fields are the same as `ConfigWithBaseUrl`.
+
+#### Examples
+
+```typescript
+// Backend with API key (production)
+const sdk = new SDK({
+  mode: 'production',
+  auth: { type: 'apiKey', apiKey: 'sk_...' },
+  origin: 'my-app'
+});
+
+// Backend with custom endpoint
+const sdk = new SDK({
+  baseUrl: 'https://custom-api.example.com',
+  auth: { type: 'apiKey', apiKey: 'sk_...' },
+  origin: 'my-app'
+});
+
+// Browser with JWT
+const sdk = new SDK({
+  mode: 'production',
+  platform: 'browser',
+  auth: { type: 'jwt' },
+  tokenStorage: customTokenStorage
+});
+
+// React Native with JWT
+const sdk = new SDK({
+  mode: 'sandbox',
+  platform: 'react-native',
+  auth: { type: 'jwt' },
+  tokenStorage: secureStorage
+});
+```
+
+---
+
+### Mode
+
+SDK operation mode.
+
+```typescript
+type Mode = 'production' | 'sandbox';
+```
+
+<ResponseField name="production" type="string">
+  Production environment. Uses live endpoints and real data. This is the default mode.
+</ResponseField>
+
+<ResponseField name="sandbox" type="string">
+  Sandbox environment. Uses isolated endpoints and mock data for development and testing.
+</ResponseField>
+
+---
+
+### Platform
+
+Runtime platform where the SDK executes.
+
+```typescript
+type Platform = 'node' | 'deno' | 'bun' | 'browser' | 'react-native';
+```
+
+<ResponseField name="node" type="string">
+  **Node.js runtime** (backend)
+  
+  Typical use cases:
+  - APIs
+  - Backend services
+  - Server-side workers
+  
+  Supports private API keys.
+</ResponseField>
+
+<ResponseField name="deno" type="string">
+  **Deno runtime** (backend)
+  
+  Typical use cases:
+  - Serverless functions
+  - Edge-like services
+  
+  Supports private API keys.
+</ResponseField>
+
+<ResponseField name="bun" type="string">
+  **Bun runtime** (backend)
+  
+  Typical use cases:
+  - High-performance backend services
+  - Local development servers
+  
+  Supports private API keys.
+</ResponseField>
+
+<ResponseField name="browser" type="string">
+  **Browser runtime** (frontend)
+  
+  Characteristics:
+  - No access to private API keys
+  - Authentication via JWT
+  - Requests include credentials (`credentials: 'include'`) to support httpOnly cookies
+  - `tokenStorage` is optional
+</ResponseField>
+
+<ResponseField name="react-native" type="string">
+  **React Native runtime** (mobile)
+  
+  Characteristics:
+  - No access to private API keys
+  - Authentication via JWT
+  - `tokenStorage` is required to provide/store the JWT token
+</ResponseField>
+
+---
+
+### AuthStrategy
+
+Authentication strategy for the SDK.
+
+```typescript
+type AuthStrategy = 
+  | { type: 'apiKey'; apiKey: string }
+  | { type: 'jwt' };
+```
+
+#### API Key Authentication
+
+<ResponseField name="type" type="'apiKey'" required>
+  Authentication type
+</ResponseField>
+
+<ResponseField name="apiKey" type="string" required>
+  Private API key for backend authentication (starts with `sk_`)
+</ResponseField>
+
+**Usage:**
+```typescript
+{
+  auth: { type: 'apiKey', apiKey: 'sk_live_...' }
+}
+```
+
+#### JWT Authentication
+
+<ResponseField name="type" type="'jwt'" required>
+  Authentication type
+</ResponseField>
+
+**Usage:**
+```typescript
+{
+  auth: { type: 'jwt' }
+}
+```
+
+---
+
+### TokenStorage
+
+Interface for storing and retrieving JWT tokens in client-side platforms.
+
+```typescript
+interface TokenStorage {
+  get(): string | null;
+  set(token: string): void;
+  clear(): void;
+}
+```
+
+<ResponseField name="get" type="() => string | null" required>
+  Retrieves the currently stored JWT token.
+  
+  Returns the JWT token, or `null` if no token is stored.
+</ResponseField>
+
+<ResponseField name="set" type="(token: string) => void" required>
+  Persists a JWT token.
+  
+  **WARNING:** If using localStorage/sessionStorage, this token will be accessible to any JavaScript code on the page, including malicious scripts.
+</ResponseField>
+
+<ResponseField name="clear" type="() => void" required>
+  Clears the stored JWT token.
+</ResponseField>
+
+#### Security Considerations
+
+<Warning>
+**localStorage / sessionStorage (INSECURE)**
+- Vulnerable to XSS attacks - any malicious script can read the token
+- Should ONLY be used for development/testing or non-sensitive apps
+- NOT recommended for production applications handling sensitive data
+</Warning>
+
+<Check>
+**httpOnly Cookies (RECOMMENDED)**
+- Best security practice - not accessible to JavaScript
+- Protects against XSS attacks
+- Requires server-side cooperation to set cookies
+</Check>
+
+<Check>
+**Secure Storage (RECOMMENDED for mobile)**
+- Use platform-specific secure storage (e.g., Keychain on iOS, Keystore on Android)
+- Libraries: `@react-native-async-storage/async-storage`, `expo-secure-store`
+</Check>
+
+#### Examples
+
+**httpOnly Cookies (Recommended):**
+
+```typescript
+const cookieStorage: TokenStorage = {
+  get: () => {
+    // Token is automatically sent in httpOnly cookie
+    // You may need to fetch from server or return null
+    return null;
+  },
+  set: (token) => {
+    // Send to server to set httpOnly cookie
+    fetch('/api/auth/set-token', {
+      method: 'POST',
+      body: JSON.stringify({ token })
+    });
+  },
+  clear: () => {
+    // Call server to clear cookie
+    fetch('/api/auth/logout', { method: 'POST' });
+  }
+};
+```
+
+**localStorage (Development Only):**
+
+```typescript
+const localStorageTokenStorage: TokenStorage = {
+  get: () => localStorage.getItem('bloque_token'),
+  set: (token) => localStorage.setItem('bloque_token', token),
+  clear: () => localStorage.removeItem('bloque_token')
+};
+```
+
+**React Native Secure Storage:**
+
+```typescript
+import * as SecureStore from 'expo-secure-store';
+
+const secureStorage: TokenStorage = {
+  get: () => SecureStore.getItemAsync('bloque_token'),
+  set: (token) => SecureStore.setItemAsync('bloque_token', token),
+  clear: () => SecureStore.deleteItemAsync('bloque_token')
+};
+```
+
+**In-Memory Storage (Most Secure):**
+
+```typescript
+let tokenCache: string | null = null;
+
+const inMemoryStorage: TokenStorage = {
+  get: () => tokenCache,
+  set: (token) => { tokenCache = token; },
+  clear: () => { tokenCache = null; }
+};
+```
+
+---
+
+### RetryConfig
+
+Configuration for automatic retry behavior.
+
+```typescript
+interface RetryConfig {
+  enabled?: boolean;
+  maxRetries?: number;
+  initialDelay?: number;
+  maxDelay?: number;
+}
+```
+
+<ResponseField name="enabled" type="boolean">
+  Whether to enable automatic retries.
+  
+  Default: `true`
+</ResponseField>
+
+<ResponseField name="maxRetries" type="number">
+  Maximum number of retry attempts.
+  
+  Default: `3`
+</ResponseField>
+
+<ResponseField name="initialDelay" type="number">
+  Initial delay in milliseconds before the first retry.
+  
+  Subsequent retries use exponential backoff: `delay * (2 ^ attempt)`.
+  
+  Default: `1000` (1 second)
+</ResponseField>
+
+<ResponseField name="maxDelay" type="number">
+  Maximum delay in milliseconds between retries.
+  
+  Prevents exponential backoff from growing too large.
+  
+  Default: `30000` (30 seconds)
+</ResponseField>
+
+#### Retry Scenarios
+
+The SDK automatically retries for:
+- **429** (Too Many Requests) - respects `Retry-After` header
+- **503** (Service Unavailable)
+- **Network errors** (timeouts, connection failures)
+
+#### Example
+
+```typescript
+const sdk = new SDK({
+  mode: 'production',
+  auth: { type: 'apiKey', apiKey: 'sk_...' },
+  retry: {
+    enabled: true,
+    maxRetries: 5,
+    initialDelay: 2000,  // Start with 2 second delay
+    maxDelay: 60000      // Cap at 60 seconds
+  }
+});
+```
+
+---
+
+## Request Types
+
+### RequestOptions
+
+Options for making HTTP requests.
+
+```typescript
+interface RequestOptions<U = unknown> {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  path: string;
+  body?: U;
+  headers?: Record<string, string>;
+  timeout?: number;
+}
+```
+
+<ResponseField name="method" type="string" required>
+  HTTP method
+</ResponseField>
+
+<ResponseField name="path" type="string" required>
+  API endpoint path (e.g., `/v1/accounts`)
+</ResponseField>
+
+<ResponseField name="body" type="U">
+  Request body (automatically serialized to JSON)
+</ResponseField>
+
+<ResponseField name="headers" type="Record<string, string>">
+  Additional HTTP headers
+</ResponseField>
+
+<ResponseField name="timeout" type="number">
+  Request timeout in milliseconds.
+  
+  If not specified, uses the default timeout from SDK config.
+  Set to 0 to disable timeout for this specific request.
+  
+  Default: `30000` (30 seconds)
+</ResponseField>
+
+<Note>
+This interface is primarily for internal use. Most SDK methods accept optional timeout/headers as parameters.
+</Note>
+
+---
+
+## Response Types
+
+### BloqueResponse
+
+Standard API response wrapper.
+
+```typescript
+interface BloqueResponse<T> {
+  data?: T;
+  error?: BloqueError;
+}
+```
+
+<ResponseField name="data" type="T">
+  Response data (present on success)
+</ResponseField>
+
+<ResponseField name="error" type="BloqueError">
+  Error details (present on failure). See [BloqueError](#bloqueerror).
+</ResponseField>
+
+---
+
+### BloqueError
+
+Error response from the API.
+
+```typescript
+interface BloqueError {
+  message: string;
+  code?: string;
+  status?: number;
+}
+```
+
+<ResponseField name="message" type="string" required>
+  Human-readable error message
+</ResponseField>
+
+<ResponseField name="code" type="string">
+  Error code (e.g., 'INVALID_ALIAS', 'INSUFFICIENT_FUNDS')
+</ResponseField>
+
+<ResponseField name="status" type="number">
+  HTTP status code
+</ResponseField>
+
+<Note>
+This is the raw error format from the API. The SDK throws specialized error classes (see [Error Classes](/api/core/errors)) instead of returning this interface.
+</Note>
+
+---
+
+## Type Usage Examples
+
+### Backend Configuration
+
+```typescript
+import { SDK, type BloqueSDKConfig } from '@bloque/sdk';
+
+const config: BloqueSDKConfig = {
+  mode: 'production',
+  platform: 'node',
+  auth: {
+    type: 'apiKey',
+    apiKey: process.env.BLOQUE_API_KEY!
+  },
+  origin: 'my-app',
+  timeout: 60000, // 60 seconds
+  retry: {
+    enabled: true,
+    maxRetries: 3
+  }
+};
+
+const sdk = new SDK(config);
+```
+
+### Frontend Configuration
+
+```typescript
+import { SDK, type BloqueSDKConfig, type TokenStorage } from '@bloque/sdk';
+
+const tokenStorage: TokenStorage = {
+  get: () => localStorage.getItem('token'),
+  set: (token) => localStorage.setItem('token', token),
+  clear: () => localStorage.removeItem('token')
+};
+
+const config: BloqueSDKConfig = {
+  mode: 'sandbox',
+  platform: 'browser',
+  auth: { type: 'jwt' },
+  tokenStorage
+};
+
+const sdk = new SDK(config);
+```
+
+### Custom Request Options
+
+```typescript
+// Most SDK methods accept optional timeout parameter
+await sdk.accounts.card.create(params, {
+  timeout: 10000 // 10 second timeout for this specific request
+});
+```

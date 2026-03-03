@@ -1,0 +1,449 @@
+---
+title: 'Exchange Rates'
+description: 'Find and use exchange rates for asset swaps'
+icon: 'chart-line'
+---
+
+## Overview
+
+The `findRates` method discovers available exchange rates between asset pairs. Rates include pricing, fees, limits, and validity periods.
+
+## Finding Rates
+
+```typescript
+const result = await user.swap.findRates({
+  fromAsset: 'COP/2',
+  toAsset: 'DUSD/6',
+  fromMediums: ['pse', 'bancolombia'],
+  toMediums: ['kusama'],
+  amountSrc: '10000000', // 100,000.00 COP
+  sort: 'asc',           // Best rate first
+  sortBy: 'rate'         // Sort by exchange ratio
+});
+
+console.log(`Found ${result.rates.length} rates`);
+console.log('Best rate:', result.rates[0]);
+```
+
+## Parameters
+
+<ParamField path="fromAsset" type="string" required>
+  Source asset with precision notation
+  
+  **Format**: `{ASSET}/{DECIMALS}`
+  
+  **Example**: `"COP/2"` (Colombian Peso with 2 decimals)
+</ParamField>
+
+<ParamField path="toAsset" type="string" required>
+  Destination asset with precision notation
+  
+  **Example**: `"DUSD/6"` (DUSD with 6 decimals)
+</ParamField>
+
+<ParamField path="fromMediums" type="string[]" required>
+  Array of source payment mediums
+  
+  **Example**: `["pse", "bancolombia", "nequi"]`
+</ParamField>
+
+<ParamField path="toMediums" type="string[]" required>
+  Array of destination payment mediums
+  
+  **Example**: `["kusama", "pomelo"]`
+</ParamField>
+
+<ParamField path="amountSrc" type="string">
+  Source amount as scaled bigint string. Provide this OR `amountDst`, not both.
+  
+  **Example**: `"10000000"` represents 100,000.00 for COP/2
+</ParamField>
+
+<ParamField path="amountDst" type="string">
+  Destination amount as scaled bigint string. Provide this OR `amountSrc`, not both.
+  
+  **Example**: `"1000000"` represents 1.000000 for DUSD/6
+</ParamField>
+
+<ParamField path="sort" type="'asc' | 'desc'" default="asc">
+  Sort order:
+  - `asc`: Best rate first (lowest ratio)
+  - `desc`: Highest rate first (highest ratio)
+</ParamField>
+
+<ParamField path="sortBy" type="'rate' | 'at'" default="rate">
+  Sort by field:
+  - `rate`: Sort by exchange ratio
+  - `at`: Sort by calculation timestamp
+</ParamField>
+
+## Response
+
+<ResponseField name="rates" type="SwapRate[]">
+  Array of available exchange rates, sorted according to parameters
+</ResponseField>
+
+### SwapRate Object
+
+<ResponseField name="id" type="string">
+  Unique rate identifier
+</ResponseField>
+
+<ResponseField name="sig" type="string">
+  Rate signature - use this when creating orders
+  
+  ```typescript
+  const order = await user.swap.pse.create({
+    rateSig: rate.sig, // Use this signature
+    // ...
+  });
+  ```
+</ResponseField>
+
+<ResponseField name="swapSig" type="string">
+  Swap signature for the transaction
+</ResponseField>
+
+<ResponseField name="maker" type="string">
+  Maker identifier providing this rate
+</ResponseField>
+
+<ResponseField name="edge" type="[string, string]">
+  Asset pair tuple `[fromAsset, toAsset]`
+  
+  **Example**: `["COP/2", "DUSD/6"]`
+</ResponseField>
+
+<ResponseField name="fromMediums" type="string[]">
+  Available source payment mediums for this rate
+</ResponseField>
+
+<ResponseField name="toMediums" type="string[]">
+  Available destination payment mediums for this rate
+</ResponseField>
+
+<ResponseField name="rate" type="[number, number]">
+  Rate tuple `[sourceAmount, destinationAmount]`
+  
+  **Example**: `[100, 1]` means 100 units of source = 1 unit of destination
+</ResponseField>
+
+<ResponseField name="ratio" type="number">
+  Exchange ratio (decimal representation)
+  
+  Lower is better for the taker (you). This is the effective exchange rate.
+  
+  **Example**: `0.01` means you get 1 destination unit per 100 source units
+</ResponseField>
+
+<ResponseField name="fee" type="Fee">
+  Detailed fee information including components and formula
+  
+  <Expandable title="Fee Object">
+    <ResponseField name="at" type="number">
+      Timestamp when the fee was calculated
+    </ResponseField>
+    
+    <ResponseField name="value" type="number">
+      Total fee value (decimal)
+    </ResponseField>
+    
+    <ResponseField name="formula" type="string">
+      Mathematical formula used to calculate the fee
+      
+      **Example**: `"(amount * 0.02) + 5000"`
+    </ResponseField>
+    
+    <ResponseField name="components" type="FeeComponent[]">
+      Individual fee components that make up the total fee
+      
+      <Expandable title="FeeComponent">
+        <ResponseField name="at" type="number">
+          Component calculation timestamp
+        </ResponseField>
+        
+        <ResponseField name="name" type="string">
+          Component name
+          
+          **Examples**: `"take_rate"`, `"pse_fee"`, `"exchange_rate"`
+        </ResponseField>
+        
+        <ResponseField name="type" type="'percentage' | 'rate' | 'fixed'">
+          Fee component type
+        </ResponseField>
+        
+        <ResponseField name="value" type="number | string">
+          Component value
+        </ResponseField>
+        
+        <ResponseField name="percentage" type="number">
+          Percentage value (only for `percentage` type)
+          
+          **Example**: `0.02` means 2%
+        </ResponseField>
+        
+        <ResponseField name="pair" type="string">
+          Currency pair (only for `rate` type)
+          
+          **Example**: `"COP/USD"`
+        </ResponseField>
+        
+        <ResponseField name="amount" type="number">
+          Fixed amount (only for `fixed` type)
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="fromLimits" type="[string, string]">
+  Source amount limits `[min, max]` as scaled bigint strings
+  
+  **Example**: `["100000", "100000000"]` for COP/2 = 1,000 to 1,000,000 COP
+</ResponseField>
+
+<ResponseField name="toLimits" type="[string, string]">
+  Destination amount limits `[min, max]` as scaled bigint strings
+</ResponseField>
+
+<ResponseField name="at" type="string">
+  ISO timestamp when the rate was created
+</ResponseField>
+
+<ResponseField name="until" type="string">
+  ISO timestamp when the rate expires
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO timestamp of rate creation
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO timestamp of last rate update
+</ResponseField>
+
+## Understanding Fees
+
+Fees are composed of multiple components that can be percentage-based, fixed amounts, or rate-based:
+
+```typescript
+const rate = result.rates[0];
+
+console.log('Total fee:', rate.fee.value);
+console.log('Fee formula:', rate.fee.formula);
+
+// Examine fee components
+for (const component of rate.fee.components) {
+  console.log(`Component: ${component.name}`);
+  console.log(`Type: ${component.type}`);
+  
+  if (component.type === 'percentage') {
+    console.log(`Percentage: ${component.percentage * 100}%`);
+  } else if (component.type === 'fixed') {
+    console.log(`Fixed amount: ${component.amount}`);
+  } else if (component.type === 'rate') {
+    console.log(`Rate pair: ${component.pair}`);
+  }
+}
+```
+
+### Common Fee Components
+
+<AccordionGroup>
+  <Accordion title="take_rate - Platform Fee">
+    Percentage-based fee charged by the Bloque platform
+    
+    ```typescript
+    {
+      name: 'take_rate',
+      type: 'percentage',
+      percentage: 0.02, // 2%
+      value: 2000      // For 100,000 COP
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="pse_fee - PSE Transaction Fee">
+    Fixed fee charged by the PSE payment system
+    
+    ```typescript
+    {
+      name: 'pse_fee',
+      type: 'fixed',
+      amount: 5000, // 50.00 COP fixed fee
+      value: 5000
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="exchange_rate - Currency Conversion">
+    Exchange rate markup for currency conversion
+    
+    ```typescript
+    {
+      name: 'exchange_rate',
+      type: 'rate',
+      pair: 'COP/USD',
+      value: 0.00025 // Rate adjustment
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Rate Calculations
+
+Understanding how rates convert amounts:
+
+```typescript
+const rate = result.rates[0];
+
+// Given source amount, calculate destination
+const sourceAmount = 10000000; // 100,000.00 COP
+const destAmount = sourceAmount * rate.ratio;
+console.log(`${sourceAmount} COP = ${destAmount} DUSD`);
+
+// Account for fees
+const totalFee = rate.fee.value;
+const netDestAmount = destAmount - totalFee;
+console.log(`After fees: ${netDestAmount} DUSD`);
+
+// Check against limits
+const [minFrom, maxFrom] = rate.fromLimits;
+const [minTo, maxTo] = rate.toLimits;
+
+if (sourceAmount < Number(minFrom)) {
+  console.error(`Amount below minimum: ${minFrom}`);
+}
+if (sourceAmount > Number(maxFrom)) {
+  console.error(`Amount above maximum: ${maxFrom}`);
+}
+```
+
+## Filtering Rates
+
+Find the best rate for your needs:
+
+```typescript
+// Find cheapest rate (lowest ratio)
+const cheapest = result.rates.reduce((best, current) => 
+  current.ratio < best.ratio ? current : best
+);
+
+// Find rate with specific medium
+const pseRates = result.rates.filter(rate => 
+  rate.fromMediums.includes('pse')
+);
+
+// Find rate within amount limits
+const targetAmount = '10000000';
+const validRates = result.rates.filter(rate => {
+  const [min, max] = rate.fromLimits;
+  return targetAmount >= min && targetAmount <= max;
+});
+
+// Find rate with lowest fees
+const lowestFee = result.rates.reduce((best, current) => 
+  current.fee.value < best.fee.value ? current : best
+);
+```
+
+## Rate Expiration
+
+Rates have a validity period:
+
+```typescript
+const rate = result.rates[0];
+
+const validUntil = new Date(rate.until);
+const now = new Date();
+const minutesRemaining = (validUntil - now) / 1000 / 60;
+
+console.log(`Rate valid for ${minutesRemaining} minutes`);
+
+if (minutesRemaining < 5) {
+  console.warn('Rate expires soon, fetch new rates');
+}
+```
+
+<Warning>
+Rates expire after a set period (typically 5-10 minutes). Always check `rate.until` before creating orders. If a rate expires, the order creation will fail.
+</Warning>
+
+## Example: Complete Rate Flow
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  origin: process.env.ORIGIN,
+  auth: { type: 'apiKey', apiKey: process.env.API_KEY },
+  mode: 'sandbox',
+  platform: 'node'
+});
+
+const user = await bloque.connect('nestor');
+
+// 1. Find rates for PSE to Kusama swap
+const result = await user.swap.findRates({
+  fromAsset: 'COP/2',
+  toAsset: 'DUSD/6',
+  fromMediums: ['pse'],
+  toMediums: ['kusama'],
+  amountSrc: '10000000', // 100,000.00 COP
+  sort: 'asc'
+});
+
+if (result.rates.length === 0) {
+  throw new Error('No rates available');
+}
+
+// 2. Analyze the best rate
+const bestRate = result.rates[0];
+console.log('Exchange ratio:', bestRate.ratio);
+console.log('Total fee:', bestRate.fee.value);
+console.log('Fee breakdown:');
+for (const component of bestRate.fee.components) {
+  console.log(`  ${component.name}: ${component.value}`);
+}
+
+// 3. Calculate expected amounts
+const sourceAmount = 10000000;
+const grossDest = sourceAmount * bestRate.ratio;
+const netDest = grossDest - bestRate.fee.value;
+console.log(`You pay: ${sourceAmount / 100} COP`);
+console.log(`You receive: ${netDest / 1000000} DUSD`);
+
+// 4. Use the rate signature to create an order
+const order = await user.swap.pse.create({
+  rateSig: bestRate.sig,
+  toMedium: 'kusama',
+  amountSrc: '10000000',
+  depositInformation: {
+    urn: 'did:bloque:account:card:usr-xxx:crd-xxx'
+  },
+  args: {
+    bankCode: '1',
+    userType: 0,
+    customerEmail: 'user@example.com',
+    userLegalIdType: 'CC',
+    userLegalId: '1234567890',
+    customerData: {
+      fullName: 'John Doe',
+      phoneNumber: '3001234567'
+    }
+  }
+});
+
+console.log('Order created:', order.order.id);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="PSE Integration" icon="building-columns" href="/swap/pse">
+    Use rates to create PSE top-up orders
+  </Card>
+  <Card title="Bank Transfers" icon="money-bill-transfer" href="/swap/bank-transfers">
+    Use rates for bank transfer cash-outs
+  </Card>
+</CardGroup>

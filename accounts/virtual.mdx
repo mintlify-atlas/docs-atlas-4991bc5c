@@ -1,0 +1,415 @@
+---
+title: 'Virtual Accounts'
+description: 'Create and manage virtual accounts with VirtualClient'
+---
+
+## Overview
+
+Virtual accounts are simple digital accounts ideal for testing and development. They require minimal information to create and can be used to hold balances and facilitate transfers.
+
+## Accessing VirtualClient
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  auth: {
+    type: 'apiKey',
+    apiKey: process.env.BLOQUE_API_KEY,
+  },
+});
+
+const user = await bloque.connect('@username');
+const virtualClient = user.accounts.virtual;
+```
+
+## Creating Virtual Accounts
+
+### Basic Creation
+
+```typescript
+const account = await user.accounts.virtual.create({});
+
+console.log(account.urn);
+console.log(account.status); // 'creation_in_progress'
+```
+
+### Wait for Active Status
+
+Use the `waitLedger` option to wait for the account to become active:
+
+```typescript
+const account = await user.accounts.virtual.create(
+  {},
+  { waitLedger: true }
+);
+
+console.log(account.status); // 'active'
+console.log(account.ledgerId);
+console.log(account.balance);
+```
+
+### Create with Name
+
+```typescript
+const account = await user.accounts.virtual.create({
+  name: 'My Savings Account',
+});
+```
+
+### Create with Metadata
+
+```typescript
+const account = await user.accounts.virtual.create({
+  name: 'Test Account',
+  metadata: {
+    purpose: 'testing',
+    environment: 'development',
+  },
+});
+```
+
+### Create with Webhook
+
+```typescript
+const account = await user.accounts.virtual.create({
+  webhookUrl: 'https://api.example.com/webhooks/account-events',
+});
+```
+
+### Link to Existing Ledger
+
+Share a ledger account with other accounts (creates a "pocket"):
+
+```typescript
+// Create first virtual account
+const account1 = await user.accounts.virtual.create({}, { waitLedger: true });
+
+// Create card linked to same ledger
+const card = await user.accounts.card.create(
+  {
+    ledgerId: account1.ledgerId,
+    name: 'My Card',
+  },
+  { waitLedger: true }
+);
+
+// Create Polygon wallet linked to same ledger
+const polygon = await user.accounts.polygon.create(
+  {
+    ledgerId: account1.ledgerId,
+  },
+  { waitLedger: true }
+);
+
+// All three accounts now share the same balance
+```
+
+<Note>
+Linking multiple accounts to the same ledger creates a "pocket" - a shared balance accessible by multiple payment methods.
+</Note>
+
+## Listing Virtual Accounts
+
+### List All Virtual Accounts
+
+```typescript
+const { accounts } = await user.accounts.virtual.list();
+
+accounts.forEach(account => {
+  console.log(account.urn);
+  console.log(account.firstName);
+  console.log(account.lastName);
+  console.log(account.status);
+  console.log(account.balance);
+});
+```
+
+### Get Specific Account
+
+```typescript
+const { accounts } = await user.accounts.virtual.list({
+  urn: 'did:bloque:account:virtual:acc-12345'
+});
+
+const account = accounts[0];
+```
+
+## Virtual Account Details
+
+The `VirtualAccount` type includes:
+
+<ResponseField name="urn" type="string" required>
+  Unique resource name for the virtual account
+</ResponseField>
+
+<ResponseField name="id" type="string" required>
+  Account ID
+</ResponseField>
+
+<ResponseField name="firstName" type="string" required>
+  Account holder's first name
+</ResponseField>
+
+<ResponseField name="lastName" type="string" required>
+  Account holder's last name
+</ResponseField>
+
+<ResponseField name="status" type="AccountStatus" required>
+  Current status: `creation_in_progress`, `active`, `disabled`, `frozen`, `deleted`, or `creation_failed`
+</ResponseField>
+
+<ResponseField name="ownerUrn" type="string" required>
+  URN of the account owner
+</ResponseField>
+
+<ResponseField name="ledgerId" type="string" required>
+  Ledger account ID associated with this account
+</ResponseField>
+
+<ResponseField name="webhookUrl" type="string | null">
+  Webhook URL for account events (if configured)
+</ResponseField>
+
+<ResponseField name="metadata" type="Record<string, string>">
+  Custom metadata attached to the account (all values must be strings)
+</ResponseField>
+
+<ResponseField name="balance" type="Record<string, TokenBalance>">
+  Token balances by asset (included in list responses and after creation)
+</ResponseField>
+
+## Managing Virtual Accounts
+
+### Update Metadata
+
+```typescript
+const account = await user.accounts.virtual.updateMetadata({
+  urn: 'did:bloque:mediums:virtual:account:123',
+  metadata: {
+    updated_by: 'admin',
+    update_reason: 'testing_update',
+  },
+});
+```
+
+<Warning>
+The `source` field is reserved and cannot be modified through `updateMetadata`.
+</Warning>
+
+### Activate Account
+
+```typescript
+const account = await user.accounts.virtual.activate(
+  'did:bloque:mediums:virtual:account:123'
+);
+
+console.log(account.status); // 'active'
+```
+
+### Freeze Account
+
+```typescript
+const account = await user.accounts.virtual.freeze(
+  'did:bloque:mediums:virtual:account:123'
+);
+
+console.log(account.status); // 'frozen'
+```
+
+### Disable Account
+
+```typescript
+const account = await user.accounts.virtual.disable(
+  'did:bloque:mediums:virtual:account:123'
+);
+
+console.log(account.status); // 'disabled'
+```
+
+## Using Virtual Accounts
+
+### Check Balance
+
+Use the general `accounts.balance()` method:
+
+```typescript
+const balance = await user.accounts.balance(
+  'did:bloque:account:virtual:acc-12345'
+);
+
+Object.entries(balance).forEach(([asset, b]) => {
+  console.log(`${asset}:`);
+  console.log(`  Current: ${b.current}`);
+  console.log(`  Pending: ${b.pending}`);
+  console.log(`  In: ${b.in}`);
+  console.log(`  Out: ${b.out}`);
+});
+```
+
+### Transfer Funds
+
+```typescript
+// Transfer from virtual account to card
+const transfer = await user.accounts.transfer({
+  sourceUrn: 'did:bloque:account:virtual:acc-12345',
+  destinationUrn: 'did:bloque:account:card:usr-123:crd-456',
+  amount: '1000000000000',
+  asset: 'KSM/12',
+  metadata: {
+    reference: 'load-card',
+  },
+});
+```
+
+### View Transaction History
+
+```typescript
+const { data, hasMore, next } = await user.accounts.movements({
+  urn: 'did:bloque:account:virtual:acc-12345',
+  asset: 'DUSD/6',
+  limit: 50,
+});
+
+data.forEach(movement => {
+  console.log(movement.type);      // 'deposit' | 'withdraw' | 'transfer'
+  console.log(movement.amount);
+  console.log(movement.direction); // 'in' | 'out'
+  console.log(movement.status);
+});
+```
+
+## Common Use Cases
+
+### Testing and Development
+
+Virtual accounts are perfect for testing:
+
+```typescript
+// Create test account
+const testAccount = await user.accounts.virtual.create(
+  {
+    name: 'Test Account',
+    metadata: {
+      environment: 'test',
+    },
+  },
+  { waitLedger: true }
+);
+
+// Perform test operations
+const transfer = await user.accounts.transfer({
+  sourceUrn: fundingAccount.urn,
+  destinationUrn: testAccount.urn,
+  amount: '5000000',
+  asset: 'DUSD/6',
+});
+```
+
+### Creating Pockets
+
+Link multiple payment methods to a single balance:
+
+```typescript
+// 1. Create virtual account (becomes the pocket)
+const pocket = await user.accounts.virtual.create({}, { waitLedger: true });
+
+// 2. Add card to pocket
+const card = await user.accounts.card.create(
+  {
+    ledgerId: pocket.ledgerId,
+    name: 'Spending Card',
+  },
+  { waitLedger: true }
+);
+
+// 3. Add Polygon wallet to pocket
+const polygon = await user.accounts.polygon.create(
+  {
+    ledgerId: pocket.ledgerId,
+  },
+  { waitLedger: true }
+);
+
+// Now you can:
+// - Receive crypto in the Polygon wallet
+// - Spend with the card
+// - All using the same shared balance
+```
+
+## API Reference
+
+### create()
+
+Create a new virtual account.
+
+<ParamField path="params" type="CreateVirtualAccountParams">
+  <ParamField path="name" type="string">
+    Display name for the virtual account
+  </ParamField>
+  <ParamField path="ledgerId" type="string">
+    Ledger account ID to associate with the virtual account. If not provided, a new ledger account will be created automatically.
+  </ParamField>
+  <ParamField path="webhookUrl" type="string">
+    Webhook URL to receive account events
+  </ParamField>
+  <ParamField path="metadata" type="Record<string, string>">
+    Custom metadata to attach to the virtual account (all values must be strings)
+  </ParamField>
+</ParamField>
+
+<ParamField path="options" type="CreateAccountOptions">
+  <ParamField path="waitLedger" type="boolean" default={false}>
+    If true, wait for the account to become active before returning
+  </ParamField>
+  <ParamField path="timeout" type="number" default={60000}>
+    Maximum time to wait in milliseconds (only applies when waitLedger is true)
+  </ParamField>
+</ParamField>
+
+### list()
+
+List virtual accounts.
+
+<ParamField path="params" type="ListVirtualAccountsParams">
+  <ParamField path="urn" type="string">
+    URN of a specific virtual account to retrieve
+  </ParamField>
+</ParamField>
+
+### updateMetadata()
+
+Update virtual account metadata.
+
+<ParamField path="params" type="UpdateVirtualMetadataParams" required>
+  <ParamField path="urn" type="string" required>
+    URN of the virtual account to update
+  </ParamField>
+  <ParamField path="metadata" type="Record<string, string>" required>
+    Metadata to update (source is reserved)
+  </ParamField>
+</ParamField>
+
+### activate()
+
+Activate a virtual account.
+
+<ParamField path="urn" type="string" required>
+  Virtual account URN
+</ParamField>
+
+### freeze()
+
+Freeze a virtual account.
+
+<ParamField path="urn" type="string" required>
+  Virtual account URN
+</ParamField>
+
+### disable()
+
+Disable a virtual account.
+
+<ParamField path="urn" type="string" required>
+  Virtual account URN
+</ParamField>

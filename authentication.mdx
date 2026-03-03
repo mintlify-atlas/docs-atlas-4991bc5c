@@ -1,0 +1,410 @@
+---
+title: 'Authentication'
+description: 'Learn how to authenticate with the Bloque SDK using API keys and JWT tokens'
+---
+
+## Authentication Methods
+
+The Bloque SDK supports two authentication methods depending on your platform:
+
+- **API Key** - For backend environments (Node.js, Bun, Deno)
+- **JWT** - For frontend environments (browsers, React Native)
+
+<Note>
+  The SDK automatically validates that your authentication method matches your platform.
+</Note>
+
+## API Key Authentication
+
+API key authentication is used for server-side applications where you can securely store credentials.
+
+### When to Use API Keys
+
+Use API key authentication when:
+
+- Running in Node.js, Bun, or Deno
+- Building backend services or APIs
+- You can securely store the API key (never in client-side code)
+- You need full programmatic control over user sessions
+
+### Setup
+
+<Steps>
+  <Step title="Get Your Credentials">
+    You'll need:
+    - **Origin**: Your organization identifier
+    - **API Key**: Your secret authentication key
+
+    Store these securely in environment variables:
+
+    ```bash .env
+    BLOQUE_ORIGIN=your-origin
+    BLOQUE_API_KEY=your-api-key
+    BLOQUE_MODE=production  # or 'sandbox'
+    ```
+  </Step>
+
+  <Step title="Initialize the SDK">
+    ```typescript
+    import { SDK } from '@bloque/sdk';
+
+    const bloque = new SDK({
+      origin: process.env.BLOQUE_ORIGIN!,
+      auth: {
+        type: 'apiKey',
+        apiKey: process.env.BLOQUE_API_KEY!,
+      },
+      mode: 'production',
+      platform: 'node', // or 'bun', 'deno'
+    });
+    ```
+  </Step>
+
+  <Step title="Register or Connect Users">
+    With API key auth, you can register new users or connect to existing ones:
+
+    ```typescript
+    // Register a new user
+    const session = await bloque.register('@alice', {
+      type: 'individual',
+      profile: {
+        firstName: 'Alice',
+        lastName: 'Smith',
+        email: 'alice@example.com',
+        phone: '+1234567890',
+        birthdate: '1992-05-15',
+        city: 'San Francisco',
+        state: 'CA',
+        postalCode: '94102',
+        countryOfBirthCode: 'US',
+        countryOfResidenceCode: 'US',
+      },
+    });
+
+    // Or connect to an existing user
+    const session = await bloque.connect('@alice');
+
+    console.log('Connected to:', session.urn);
+    ```
+  </Step>
+</Steps>
+
+### Session Object
+
+The `register()` and `connect()` methods return a session object with access to all APIs:
+
+```typescript
+const session = await bloque.connect('@alice');
+
+// Access user resources
+session.accounts   // Accounts API (cards, virtual, polygon, etc.)
+session.compliance // Compliance API (KYC/KYB)
+session.identity   // Identity API (aliases, profile)
+session.orgs       // Organizations API
+session.swap       // Swap API (currency exchange)
+session.urn        // User's unique resource name
+session.accessToken // Current access token (read-only)
+```
+
+### Complete Example
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  origin: process.env.BLOQUE_ORIGIN!,
+  auth: {
+    type: 'apiKey',
+    apiKey: process.env.BLOQUE_API_KEY!,
+  },
+  mode: 'production',
+});
+
+// Connect to user
+const session = await bloque.connect('@alice');
+
+// Create a virtual account
+const virtual = await session.accounts.virtual.create({});
+
+// Create a card
+const card = await session.accounts.card.create({
+  ledgerId: virtual.ledgerId,
+  name: 'Alice\'s Card',
+});
+
+console.log('Card created:', card.urn);
+```
+
+<Warning>
+  Never expose your API key in client-side code, version control, or public repositories.
+</Warning>
+
+## JWT Authentication
+
+JWT (JSON Web Token) authentication is used for client-side applications where API keys cannot be securely stored.
+
+### When to Use JWT
+
+Use JWT authentication when:
+
+- Running in browsers or React Native
+- Building frontend applications
+- Users authenticate directly with the platform
+- You cannot securely store API keys
+
+### Browser Setup
+
+<Steps>
+  <Step title="Initialize with JWT">
+    ```typescript
+    import { SDK } from '@bloque/sdk';
+
+    const bloque = new SDK({
+      auth: {
+        type: 'jwt',
+      },
+      mode: 'production',
+      platform: 'browser',
+    });
+    ```
+
+    <Note>
+      For browser platforms, the SDK uses `credentials: 'include'` to support httpOnly cookies.
+    </Note>
+  </Step>
+
+  <Step title="Authenticate">
+    ```typescript
+    // Authenticate and get user session
+    const session = await bloque.authenticate();
+
+    console.log('Authenticated as:', session.urn);
+    ```
+  </Step>
+
+  <Step title="Two-Factor Authentication (OTP)">
+    For operations requiring additional verification:
+
+    ```typescript
+    // Request OTP
+    const result = await bloque.assert('your-origin', 'alice@example.com');
+
+    console.log('OTP sent to:', result.value.email);
+    console.log('Expires at:', result.value.expires_at);
+
+    // Verify OTP and connect
+    const session = await bloque.connect(
+      'your-origin',
+      'alice@example.com',
+      '123456' // OTP code
+    );
+    ```
+  </Step>
+</Steps>
+
+### React Native Setup
+
+<Steps>
+  <Step title="Install Dependencies">
+    ```bash
+    npm install @bloque/sdk
+    npm install @react-native-async-storage/async-storage
+    ```
+  </Step>
+
+  <Step title="Implement Token Storage">
+    ```typescript
+    import AsyncStorage from '@react-native-async-storage/async-storage';
+
+    const tokenStorage = {
+      get: async () => {
+        return await AsyncStorage.getItem('bloque_token');
+      },
+      set: async (token: string) => {
+        await AsyncStorage.setItem('bloque_token', token);
+      },
+      clear: async () => {
+        await AsyncStorage.removeItem('bloque_token');
+      },
+    };
+    ```
+  </Step>
+
+  <Step title="Initialize SDK">
+    ```typescript
+    import { SDK } from '@bloque/sdk';
+
+    const bloque = new SDK({
+      auth: {
+        type: 'jwt',
+      },
+      mode: 'production',
+      platform: 'react-native',
+      tokenStorage,
+    });
+    ```
+  </Step>
+</Steps>
+
+### Secure Token Storage
+
+For production applications, use secure storage mechanisms:
+
+<CodeGroup>
+```typescript Browser (httpOnly Cookies)
+// Recommended: Use httpOnly cookies set by your backend
+const tokenStorage = {
+  get: () => null, // Token sent automatically in cookies
+  set: (token) => {
+    // Send to backend to set httpOnly cookie
+    fetch('/api/auth/set-token', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  },
+  clear: () => {
+    fetch('/api/auth/logout', { method: 'POST' });
+  },
+};
+```
+
+```typescript React Native (Secure Storage)
+import * as SecureStore from 'expo-secure-store';
+
+const tokenStorage = {
+  get: async () => await SecureStore.getItemAsync('bloque_token'),
+  set: async (token: string) => {
+    await SecureStore.setItemAsync('bloque_token', token);
+  },
+  clear: async () => await SecureStore.deleteItemAsync('bloque_token'),
+};
+```
+
+```typescript In-Memory (Most Secure)
+let memoryToken: string | null = null;
+
+const tokenStorage = {
+  get: () => memoryToken,
+  set: (token: string) => { memoryToken = token; },
+  clear: () => { memoryToken = null; },
+};
+
+// Note: Token is lost on page refresh
+```
+</CodeGroup>
+
+<Warning>
+  **Security Warning**: localStorage and sessionStorage are vulnerable to XSS attacks.
+  Use httpOnly cookies (browser) or secure storage (React Native) for production applications.
+</Warning>
+
+## Configuration Options
+
+Both authentication methods support additional configuration:
+
+```typescript
+const bloque = new SDK({
+  origin: 'your-origin',
+  auth: { type: 'apiKey', apiKey: 'your-key' },
+  mode: 'production', // or 'sandbox'
+  platform: 'node', // 'node' | 'bun' | 'deno' | 'browser' | 'react-native'
+  
+  // Optional: Custom base URL
+  baseUrl: 'https://custom-api.bloque.app',
+  
+  // Optional: Request timeout (default: 30000ms)
+  timeout: 30000,
+  
+  // Optional: Retry configuration
+  retry: {
+    enabled: true,
+    maxRetries: 3,
+    initialDelay: 1000,
+    maxDelay: 30000,
+  },
+});
+```
+
+## Error Handling
+
+Handle authentication errors gracefully:
+
+```typescript
+import { SDK } from '@bloque/sdk';
+import { BloqueAuthenticationError } from '@bloque/sdk-core';
+
+try {
+  const bloque = new SDK({
+    origin: process.env.BLOQUE_ORIGIN!,
+    auth: {
+      type: 'apiKey',
+      apiKey: process.env.BLOQUE_API_KEY!,
+    },
+  });
+
+  const session = await bloque.connect('@alice');
+} catch (error) {
+  if (error instanceof BloqueAuthenticationError) {
+    console.error('Authentication failed:', error.message);
+    console.error('Request ID:', error.requestId);
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Backend: Use API Keys" icon="server">
+    Always use API key authentication for server-side applications.
+  </Card>
+  <Card title="Frontend: Use JWT" icon="browser">
+    Use JWT authentication for client-side applications.
+  </Card>
+  <Card title="Never Expose Secrets" icon="eye-slash">
+    Never commit API keys to version control or expose them in client code.
+  </Card>
+  <Card title="Use Environment Variables" icon="file-code">
+    Store credentials in environment variables, not in source code.
+  </Card>
+  <Card title="Rotate Keys Regularly" icon="rotate">
+    Rotate API keys periodically for better security.
+  </Card>
+  <Card title="Use Sandbox for Testing" icon="flask">
+    Always test with sandbox mode before going to production.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get started with your first API call
+  </Card>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api/sdk"
+  >
+    Explore the complete API documentation
+  </Card>
+  <Card
+    title="Error Handling"
+    icon="triangle-exclamation"
+    href="/concepts/error-handling"
+  >
+    Learn about error types and handling
+  </Card>
+  <Card
+    title="Guides"
+    icon="book"
+    href="/guides/transfers"
+  >
+    Browse practical guides and examples
+  </Card>
+</CardGroup>

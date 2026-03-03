@@ -1,0 +1,446 @@
+---
+title: PseClient
+description: PSE (Pagos Seguros en Línea) payment utilities
+---
+
+## Overview
+
+The `PseClient` provides utilities for PSE (Pagos Seguros en Línea) payments, including:
+
+- Listing available Colombian banks for PSE
+- Creating PSE swap orders with automatic payment execution
+
+Access it via `bloque.swap.pse`.
+
+## Constructor
+
+The `PseClient` is automatically initialized as part of the `SwapClient`.
+
+```typescript
+import { Bloque } from '@bloque/sdk';
+
+const bloque = new Bloque({ apiKey: 'your-api-key' });
+const pseClient = bloque.swap.pse;
+```
+
+## Methods
+
+### banks()
+
+Retrieves the list of financial institutions available for PSE payments.
+
+```typescript
+async banks(): Promise<ListBanksResult>
+```
+
+#### Returns
+
+<ResponseField name="ListBanksResult" type="object">
+  <Expandable title="ListBanksResult properties">
+    <ResponseField name="banks" type="Bank[]">
+      Array of available banks
+
+      <Expandable title="Bank properties">
+        <ResponseField name="code" type="string">
+          Financial institution code (use this when creating PSE orders)
+        </ResponseField>
+
+        <ResponseField name="name" type="string">
+          Financial institution name
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Example
+
+```typescript
+const result = await bloque.swap.pse.banks();
+
+for (const bank of result.banks) {
+  console.log(`${bank.code}: ${bank.name}`);
+}
+
+// Output:
+// 1: Banco de Bogotá
+// 2: Banco Popular
+// 3: Bancolombia
+// ...
+```
+
+### create()
+
+Creates a PSE swap order with optional automatic payment execution.
+
+```typescript
+async create(params: CreatePseOrderParams): Promise<CreatePseOrderResult>
+```
+
+#### Parameters
+
+<ParamField path="params" type="CreatePseOrderParams" required>
+  PSE order parameters
+
+  <Expandable title="CreatePseOrderParams properties">
+    <ParamField path="rateSig" type="string" required>
+      Rate signature obtained from `findRates()`
+    </ParamField>
+
+    <ParamField path="toMedium" type="string" required>
+      Destination medium (e.g., `'kusama'`, `'bloque'`)
+    </ParamField>
+
+    <ParamField path="depositInformation" type="DepositInformation" required>
+      Account where funds will be deposited
+
+      <Expandable title="DepositInformation properties">
+        <ParamField path="urn" type="string" required>
+          Account URN where funds will be deposited
+          
+          **Example:** `"did:bloque:account:card:usr-xxx:crd-xxx"`
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField path="args" type="PsePaymentArgs" required>
+      PSE payment arguments for auto-execution
+
+      <Expandable title="PsePaymentArgs properties">
+        <ParamField path="bankCode" type="string" required>
+          Bank code from PSE banks list (obtained via `banks()`)
+        </ParamField>
+
+        <ParamField path="userType" type="0 | 1" required>
+          User type:
+          - `0`: Natural person
+          - `1`: Legal entity
+        </ParamField>
+
+        <ParamField path="customerEmail" type="string" required>
+          Customer email address
+        </ParamField>
+
+        <ParamField path="userLegalIdType" type="'CC' | 'NIT' | 'CE'" required>
+          User legal ID type:
+          - `CC`: Cédula de Ciudadanía
+          - `NIT`: Número de Identificación Tributaria
+          - `CE`: Cédula de Extranjería
+        </ParamField>
+
+        <ParamField path="userLegalId" type="string" required>
+          User legal ID number
+        </ParamField>
+
+        <ParamField path="customerData" type="PseCustomerData" required>
+          Additional customer data
+
+          <Expandable title="PseCustomerData properties">
+            <ParamField path="fullName" type="string" required>
+              Customer's full name
+            </ParamField>
+
+            <ParamField path="phoneNumber" type="string" required>
+              Customer's phone number
+            </ParamField>
+          </Expandable>
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField path="amountSrc" type="string">
+      Source amount as bigint string (required if `type` is `'src'`)
+      
+      **Example:** `"1000000"` represents 10000.00 for COP/2
+    </ParamField>
+
+    <ParamField path="amountDst" type="string">
+      Destination amount as bigint string (required if `type` is `'dst'`)
+    </ParamField>
+
+    <ParamField path="type" type="'src' | 'dst'" default="src">
+      Order type:
+      - `'src'`: Taker specifies exact source amount to pay
+      - `'dst'`: Taker specifies exact destination amount to receive
+    </ParamField>
+
+    <ParamField path="webhookUrl" type="string">
+      Optional webhook URL for order status notifications
+    </ParamField>
+
+    <ParamField path="nodeId" type="string">
+      Specific node ID to execute (defaults to first node)
+    </ParamField>
+
+    <ParamField path="metadata" type="Record<string, unknown>">
+      Additional metadata for the order
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+#### Returns
+
+<ResponseField name="CreatePseOrderResult" type="object">
+  <Expandable title="CreatePseOrderResult properties">
+    <ResponseField name="order" type="SwapOrder">
+      The created swap order
+
+      <Expandable title="SwapOrder properties">
+        <ResponseField name="id" type="string">
+          Unique order identifier
+        </ResponseField>
+
+        <ResponseField name="orderSig" type="string">
+          Order signature
+        </ResponseField>
+
+        <ResponseField name="rateSig" type="string">
+          Rate signature used for this order
+        </ResponseField>
+
+        <ResponseField name="swapSig" type="string">
+          Swap signature
+        </ResponseField>
+
+        <ResponseField name="taker" type="string">
+          Taker URN
+        </ResponseField>
+
+        <ResponseField name="maker" type="string">
+          Maker URN
+        </ResponseField>
+
+        <ResponseField name="fromAsset" type="string">
+          Source asset
+        </ResponseField>
+
+        <ResponseField name="toAsset" type="string">
+          Destination asset
+        </ResponseField>
+
+        <ResponseField name="fromMedium" type="string">
+          Source medium (always `"pse"` for PSE orders)
+        </ResponseField>
+
+        <ResponseField name="toMedium" type="string">
+          Destination medium
+        </ResponseField>
+
+        <ResponseField name="fromAmount" type="string">
+          Source amount
+        </ResponseField>
+
+        <ResponseField name="toAmount" type="string">
+          Destination amount
+        </ResponseField>
+
+        <ResponseField name="at" type="string">
+          Timestamp when the order was created
+        </ResponseField>
+
+        <ResponseField name="graphId" type="string">
+          Instruction graph ID for tracking execution
+        </ResponseField>
+
+        <ResponseField name="status" type="string">
+          Order status
+        </ResponseField>
+
+        <ResponseField name="metadata" type="Record<string, unknown>">
+          Additional metadata
+        </ResponseField>
+
+        <ResponseField name="createdAt" type="string">
+          Creation timestamp
+        </ResponseField>
+
+        <ResponseField name="updatedAt" type="string">
+          Last update timestamp
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="execution" type="ExecutionResult">
+      Execution result (if args were provided for auto-execution)
+
+      <Expandable title="ExecutionResult properties">
+        <ResponseField name="nodeId" type="string">
+          Node ID that was executed
+        </ResponseField>
+
+        <ResponseField name="result" type="object">
+          Execution result details
+
+          <Expandable title="result properties">
+            <ResponseField name="status" type="string">
+              Execution status (e.g., `"paused"` when waiting for user to complete PSE payment)
+            </ResponseField>
+
+            <ResponseField name="name" type="string">
+              Name of the current step
+            </ResponseField>
+
+            <ResponseField name="description" type="string">
+              Description of what the user needs to do
+            </ResponseField>
+
+            <ResponseField name="how" type="ExecutionHow">
+              Instructions for completing this step
+
+              <Expandable title="ExecutionHow properties">
+                <ResponseField name="type" type="string">
+                  Type of action required (e.g., `"REDIRECT"`)
+                </ResponseField>
+
+                <ResponseField name="url" type="string">
+                  URL to redirect the user to complete the payment (PSE checkout URL)
+                </ResponseField>
+              </Expandable>
+            </ResponseField>
+
+            <ResponseField name="callbackToken" type="string">
+              Callback token for tracking
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="requestId" type="string">
+      Request ID for tracking
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Example
+
+```typescript
+// Step 1: Find available rates
+const rates = await bloque.swap.findRates({
+  fromAsset: 'COP/2',
+  toAsset: 'DUSD/6',
+  fromMediums: ['pse'],
+  toMediums: ['kusama'],
+  amountSrc: '10000000' // 100,000.00 COP
+});
+
+// Step 2: Get available banks
+const { banks } = await bloque.swap.pse.banks();
+const bancolombia = banks.find(b => b.name.includes('Bancolombia'));
+
+// Step 3: Create order with auto-execution
+const result = await bloque.swap.pse.create({
+  rateSig: rates.rates[0].sig,
+  toMedium: 'kusama',
+  amountSrc: '10000000',
+  depositInformation: {
+    urn: 'did:bloque:account:card:usr-xxx:crd-xxx'
+  },
+  args: {
+    bankCode: bancolombia.code,
+    userType: 0, // Natural person
+    customerEmail: 'user@example.com',
+    userLegalIdType: 'CC',
+    userLegalId: '1234567890',
+    customerData: {
+      fullName: 'Juan Pérez',
+      phoneNumber: '+573001234567'
+    }
+  }
+});
+
+// Step 4: Redirect user to PSE checkout
+if (result.execution?.result.how?.url) {
+  window.location.href = result.execution.result.how.url;
+}
+
+console.log('Order ID:', result.order.id);
+console.log('Status:', result.order.status);
+```
+
+## PSE Payment Flow
+
+The PSE payment flow involves the following steps:
+
+1. **Find rates**: Use `swap.findRates()` to get available exchange rates
+2. **List banks**: Use `pse.banks()` to get available banks
+3. **Create order**: Use `pse.create()` with payment args to create and auto-execute the order
+4. **Redirect**: Redirect the user to the PSE checkout URL returned in `execution.result.how.url`
+5. **Complete payment**: User completes payment on the PSE platform
+6. **Callback**: PSE notifies Bloque of payment completion via webhook
+7. **Funds deposited**: Funds are deposited to the specified account URN
+
+## Fee Structure for PSE
+
+PSE orders include multiple fee components:
+
+```typescript
+const rate = rates.rates[0];
+
+// Example fee breakdown:
+for (const component of rate.fee.components) {
+  switch (component.name) {
+    case 'pse_fee':
+      console.log('PSE transaction fee:', component.amount);
+      break;
+    case 'take_rate':
+      console.log('Platform fee:', component.percentage, '%');
+      break;
+    case 'exchange_rate':
+      console.log('Exchange rate:', component.pair);
+      break;
+  }
+}
+
+console.log('Total fee:', rate.fee.value);
+console.log('Formula:', rate.fee.formula);
+```
+
+## Webhook Notifications
+
+You can specify a `webhookUrl` to receive order status updates:
+
+```typescript
+const result = await bloque.swap.pse.create({
+  rateSig: rates.rates[0].sig,
+  toMedium: 'kusama',
+  amountSrc: '10000000',
+  webhookUrl: 'https://your-app.com/webhooks/pse',
+  // ... other params
+});
+```
+
+Webhook payload will include:
+- Order ID
+- Status updates
+- Transaction details
+
+## Error Handling
+
+```typescript
+import { BloqueConfigError, BloqueValidationError } from '@bloque/sdk-core';
+
+try {
+  const result = await bloque.swap.pse.create(params);
+} catch (error) {
+  if (error instanceof BloqueConfigError) {
+    console.error('Not connected to a session');
+  } else if (error instanceof BloqueValidationError) {
+    console.error('Invalid parameters:', error.message);
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+## Related Types
+
+- `Bank` - PSE bank details
+- `ListBanksResult` - Result of listing banks
+- `CreatePseOrderParams` - Parameters for creating PSE orders
+- `CreatePseOrderResult` - Result of creating PSE order
+- `PsePaymentArgs` - PSE payment arguments
+- `PseCustomerData` - Customer data for PSE
+- `DepositInformation` - Deposit account details
+- `SwapOrder` - Swap order details
+- `ExecutionResult` - Auto-execution result

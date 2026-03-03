@@ -1,0 +1,275 @@
+---
+title: Account Transfers
+description: Transfer funds between accounts with single and batch operations
+---
+
+## Overview
+
+The Bloque SDK allows you to move funds seamlessly between any account types:
+- Virtual to virtual
+- Virtual to card
+- Card to Polygon wallet
+- And any other combination
+
+Transfers are queued and processed asynchronously, with optional webhook notifications for completion.
+
+## Single Transfer
+
+Transfer funds from one account to another using the `transfer()` method.
+
+<Steps>
+  <Step title="Initialize the SDK">
+    Connect to a user session:
+
+    ```typescript
+    import { SDK } from '@bloque/sdk';
+
+    const bloque = new SDK({
+      origin: process.env.ORIGIN!,
+      auth: {
+        type: 'apiKey',
+        apiKey: process.env.API_KEY!,
+      },
+      mode: 'production',
+    });
+
+    const user = await bloque.connect('@username');
+    ```
+  </Step>
+
+  <Step title="Execute the transfer">
+    Transfer funds between accounts:
+
+    ```typescript
+    const result = await user.accounts.transfer({
+      sourceUrn: savings.urn,
+      destinationUrn: spending.urn,
+      amount: '50000000',    // 50 DUSD (50 * 10^6)
+      asset: 'DUSD/6',
+      metadata: {
+        note: 'Weekly allowance',
+      },
+    });
+
+    console.log('Transfer queued:', result.queueId);
+    console.log('Status:', result.status);
+    ```
+  </Step>
+</Steps>
+
+### Understanding Amounts
+
+<Note>
+Amounts are **strings** (not numbers) to preserve precision. The asset format is `SYMBOL/DECIMALS`:
+
+- `DUSD/6` means 6 decimal places
+- `"10000000"` = 10.000000 DUSD (10 dollars)
+- `"50000000"` = 50.000000 DUSD (50 dollars)
+- `KSM/12` means 12 decimal places
+- `"1000000000000"` = 1.000000000000 KSM
+</Note>
+
+### Transfer to Card
+
+You can top up a card account from a virtual account:
+
+```typescript
+const card = await user.accounts.card.create(
+  {
+    name: 'My Card',
+    ledgerId: spending.ledgerId,
+  },
+  { waitLedger: true },
+);
+
+const topUp = await user.accounts.transfer({
+  sourceUrn: savings.urn,
+  destinationUrn: card.urn,
+  amount: '25000000', // 25 DUSD
+  asset: 'DUSD/6',
+  metadata: {
+    note: 'Card top-up',
+  },
+});
+
+console.log('Card top-up queued:', topUp.queueId);
+```
+
+## Batch Transfer
+
+Send multiple transfers in a single operation. Perfect for:
+- Payroll processing
+- Splitting bills
+- Distributing funds across multiple accounts
+
+<Note>
+Large batches (80+ operations) are automatically chunked for you. Each chunk gets its own queue ID for tracking.
+</Note>
+
+### Example: Payroll Distribution
+
+<Steps>
+  <Step title="Create employee accounts">
+    Set up accounts for the treasury and employees:
+
+    ```typescript
+    const treasury = await user.accounts.virtual.create(
+      { name: 'Treasury' },
+      { waitLedger: true },
+    );
+
+    const alice = await user.accounts.virtual.create(
+      { name: 'Alice' },
+      { waitLedger: true },
+    );
+
+    const bob = await user.accounts.virtual.create(
+      { name: 'Bob' },
+      { waitLedger: true },
+    );
+    ```
+  </Step>
+
+  <Step title="Execute batch transfer">
+    Process all payments in one batch:
+
+    ```typescript
+    const result = await user.accounts.batchTransfer({
+      reference: 'payroll-2025-02',
+      operations: [
+        {
+          fromUrn: treasury.urn,
+          toUrn: alice.urn,
+          reference: 'salary-alice-feb',
+          amount: '3000000000',  // 3,000 DUSD
+          asset: 'DUSD/6',
+          metadata: { employee: 'alice', type: 'salary' },
+        },
+        {
+          fromUrn: treasury.urn,
+          toUrn: bob.urn,
+          reference: 'salary-bob-feb',
+          amount: '2500000000',  // 2,500 DUSD
+          asset: 'DUSD/6',
+          metadata: { employee: 'bob', type: 'salary' },
+        },
+      ],
+      metadata: {
+        department: 'engineering',
+        period: '2025-02',
+      },
+      webhookUrl: 'https://api.example.com/webhooks/payroll',
+    });
+
+    console.log(`Batch sent: ${result.totalOperations} operations in ${result.totalChunks} chunk(s)`);
+
+    for (const chunk of result.chunks) {
+      console.log(`Chunk ${chunk.queueId}: ${chunk.status} — ${chunk.message}`);
+    }
+    ```
+  </Step>
+</Steps>
+
+### Batch Transfer Parameters
+
+<CodeGroup>
+```typescript Operations
+interface BatchTransferOperation {
+  fromUrn: string;          // Source account URN
+  toUrn: string;            // Destination account URN
+  reference: string;        // Unique reference for tracking
+  amount: string;           // Amount as string
+  asset: SupportedAsset;    // e.g., 'DUSD/6', 'KSM/12'
+  metadata?: Record<string, unknown>;
+}
+```
+
+```typescript Params
+interface BatchTransferParams {
+  operations: BatchTransferOperation[];
+  reference: string;        // Batch reference ID
+  metadata?: Record<string, unknown>;
+  webhookUrl?: string;      // Optional webhook for notifications
+}
+```
+
+```typescript Response
+interface BatchTransferResult {
+  chunks: BatchTransferChunkResult[];
+  totalOperations: number;
+  totalChunks: number;
+}
+
+interface BatchTransferChunkResult {
+  queueId: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  message: string;
+}
+```
+</CodeGroup>
+
+## Transfer Status
+
+Transfers are processed asynchronously. The possible statuses are:
+
+- `queued` - Transfer is queued for processing
+- `processing` - Transfer is being processed
+- `completed` - Transfer completed successfully
+- `failed` - Transfer failed (check message for details)
+
+<Tip>
+Use webhooks to receive real-time notifications when transfers complete. See the [Webhooks guide](/guides/webhooks) for setup instructions.
+</Tip>
+
+## Error Handling
+
+Handle transfer errors gracefully:
+
+```typescript
+import { BloqueInsufficientFundsError, BloqueValidationError } from '@bloque/sdk';
+
+try {
+  const result = await user.accounts.transfer({
+    sourceUrn: account1.urn,
+    destinationUrn: account2.urn,
+    amount: '1000000000',
+    asset: 'DUSD/6',
+  });
+
+  if (result.status === 'failed') {
+    console.error('Transfer failed:', result.message);
+  }
+} catch (error) {
+  if (error instanceof BloqueInsufficientFundsError) {
+    console.error('Insufficient funds for transfer');
+  } else if (error instanceof BloqueValidationError) {
+    console.error('Invalid transfer parameters:', error.message);
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use batch transfers for multiple operations" icon="layer-group">
+    Instead of multiple single transfers, use `batchTransfer()` to process them atomically.
+  </Card>
+  <Card title="Include meaningful metadata" icon="tag">
+    Add context to transfers with metadata for easier tracking and reconciliation.
+  </Card>
+  <Card title="Set up webhooks" icon="webhook">
+    Configure webhooks to receive completion notifications instead of polling.
+  </Card>
+  <Card title="Use unique references" icon="fingerprint">
+    Provide unique reference IDs for idempotency and easier debugging.
+  </Card>
+</CardGroup>
+
+## Related
+
+- [Webhooks](/guides/webhooks) - Set up webhook notifications
+- [Metadata](/guides/metadata) - Using metadata fields
+- [Card Accounts](/accounts/card) - Working with card accounts
+- [Virtual Accounts](/accounts/virtual) - Working with virtual accounts

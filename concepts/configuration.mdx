@@ -1,0 +1,437 @@
+---
+title: Configuration
+description: SDK configuration options and BloqueSDKConfig reference
+---
+
+The Bloque SDK is configured when you instantiate it. This page covers all available configuration options and their usage.
+
+## Basic Configuration
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const sdk = new SDK({
+  auth: { type: 'apiKey', apiKey: process.env.BLOQUE_API_KEY },
+  origin: 'your-origin',
+  mode: 'production'
+});
+```
+
+## BloqueSDKConfig Reference
+
+The SDK accepts a configuration object of type `BloqueSDKConfig` with the following options:
+
+### Authentication (`auth`)
+
+<ParamField path="auth" type="AuthStrategy" required>
+  Authentication strategy used by the SDK.
+  
+  <Expandable title="properties">
+    <ParamField path="type" type="'apiKey' | 'jwt'" required>
+      Authentication type.
+      - `apiKey`: Backend platforms (node, bun, deno)
+      - `jwt`: Frontend platforms (browser, react-native)
+    </ParamField>
+    
+    <ParamField path="apiKey" type="string">
+      Private API key (required when `type` is `'apiKey'`)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<CodeGroup>
+```typescript API Key Auth
+const sdk = new SDK({
+  auth: {
+    type: 'apiKey',
+    apiKey: process.env.BLOQUE_API_KEY
+  },
+  origin: 'your-origin'
+});
+```
+
+```typescript JWT Auth
+const sdk = new SDK({
+  auth: { type: 'jwt' },
+  origin: 'your-origin',
+  platform: 'browser'
+});
+```
+</CodeGroup>
+
+### Origin (`origin`)
+
+<ParamField path="origin" type="string">
+  Origin identifier for scoping requests and operations to a specific origin within the Bloque platform.
+  
+  - **Required** for API key authentication
+  - **Optional** for JWT authentication (resolved during `authenticate()`)
+</ParamField>
+
+```typescript
+const sdk = new SDK({
+  auth: { type: 'apiKey', apiKey: 'key_...' },
+  origin: 'my-app' // Required for apiKey auth
+});
+```
+
+### Platform (`platform`)
+
+<ParamField path="platform" type="Platform" default="node">
+  Platform where the SDK is executed. Determines runtime environment and capabilities.
+  
+  Options: `'node'` | `'bun'` | `'deno'` | `'browser'` | `'react-native'`
+</ParamField>
+
+```typescript
+const sdk = new SDK({
+  platform: 'browser',
+  auth: { type: 'jwt' }
+});
+```
+
+<Info>
+See [Platform Support](/concepts/platform-support) for detailed information about each platform.
+</Info>
+
+### Environment Mode (`mode`)
+
+<ParamField path="mode" type="'production' | 'sandbox'" default="production">
+  SDK operation mode.
+  
+  - `production`: Live endpoints and real data
+  - `sandbox`: Isolated endpoints and mock data for testing
+  
+  **Note:** Cannot be used with custom `baseUrl`
+</ParamField>
+
+<CodeGroup>
+```typescript Production
+const sdk = new SDK({
+  mode: 'production',
+  auth: { type: 'apiKey', apiKey: 'key_...' },
+  origin: 'my-app'
+});
+```
+
+```typescript Sandbox
+const sdk = new SDK({
+  mode: 'sandbox',
+  auth: { type: 'apiKey', apiKey: 'key_test_...' },
+  origin: 'my-app'
+});
+```
+</CodeGroup>
+
+### Base URL (`baseUrl`)
+
+<ParamField path="baseUrl" type="string">
+  Custom base URL for the SDK API endpoints.
+  
+  - Use for self-hosted or custom Bloque instances
+  - **Cannot** be specified with `mode`
+  - Overrides default production/sandbox URLs
+</ParamField>
+
+```typescript
+const sdk = new SDK({
+  baseUrl: 'https://api.custom-bloque.com',
+  auth: { type: 'apiKey', apiKey: 'key_...' },
+  origin: 'my-app'
+});
+```
+
+### Token Storage (`tokenStorage`)
+
+<ParamField path="tokenStorage" type="TokenStorage">
+  JWT token storage strategy for client-side platforms.
+  
+  - **Browser**: Optional (uses httpOnly cookies with `credentials: 'include'`)
+  - **React Native**: Required for JWT auth
+  - **Backend platforms**: Not used
+</ParamField>
+
+**TokenStorage Interface:**
+
+```typescript
+interface TokenStorage {
+  get(): string | null;
+  set(token: string): void;
+  clear(): void;
+}
+```
+
+<Tabs>
+  <Tab title="Browser (localStorage)">
+    ```typescript
+    const sdk = new SDK({
+      platform: 'browser',
+      auth: { type: 'jwt' },
+      tokenStorage: {
+        get: () => localStorage.getItem('bloque_token'),
+        set: (token) => localStorage.setItem('bloque_token', token),
+        clear: () => localStorage.removeItem('bloque_token')
+      }
+    });
+    ```
+    
+    <Warning>
+    localStorage is vulnerable to XSS attacks. Use httpOnly cookies for production.
+    </Warning>
+  </Tab>
+  
+  <Tab title="React Native (AsyncStorage)">
+    ```typescript
+    import AsyncStorage from '@react-native-async-storage/async-storage';
+    
+    const sdk = new SDK({
+      platform: 'react-native',
+      auth: { type: 'jwt' },
+      tokenStorage: {
+        get: () => AsyncStorage.getItem('bloque_token'),
+        set: (token) => AsyncStorage.setItem('bloque_token', token),
+        clear: () => AsyncStorage.removeItem('bloque_token')
+      }
+    });
+    ```
+  </Tab>
+  
+  <Tab title="In-Memory">
+    ```typescript
+    let token: string | null = null;
+    
+    const sdk = new SDK({
+      platform: 'browser',
+      auth: { type: 'jwt' },
+      tokenStorage: {
+        get: () => token,
+        set: (t) => { token = t; },
+        clear: () => { token = null; }
+      }
+    });
+    ```
+    
+    <Info>
+    Most secure against XSS, but token is lost on page refresh.
+    </Info>
+  </Tab>
+</Tabs>
+
+### Timeout (`timeout`)
+
+<ParamField path="timeout" type="number" default={30000}>
+  Default timeout for HTTP requests in milliseconds.
+  
+  - When exceeded, throws `BloqueTimeoutError`
+  - Can be overridden per-request using `RequestOptions.timeout`
+  - Set to `0` to disable timeouts globally (not recommended)
+</ParamField>
+
+```typescript
+const sdk = new SDK({
+  auth: { type: 'apiKey', apiKey: 'key_...' },
+  origin: 'my-app',
+  timeout: 60000 // 60 seconds
+});
+```
+
+### Retry Configuration (`retry`)
+
+<ParamField path="retry" type="object">
+  Automatic retry configuration for failed requests.
+  
+  <Expandable title="properties">
+    <ParamField path="enabled" type="boolean" default={true}>
+      Enable automatic retries
+    </ParamField>
+    
+    <ParamField path="maxRetries" type="number" default={3}>
+      Maximum number of retry attempts
+    </ParamField>
+    
+    <ParamField path="initialDelay" type="number" default={1000}>
+      Initial delay in milliseconds before first retry. Uses exponential backoff: `delay * (2 ^ attempt)`
+    </ParamField>
+    
+    <ParamField path="maxDelay" type="number" default={30000}>
+      Maximum delay in milliseconds between retries
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+The SDK automatically retries:
+- `429` Too Many Requests (respects `Retry-After` header)
+- `503` Service Unavailable
+- Network errors (timeouts, connection failures)
+
+<CodeGroup>
+```typescript Default Retry
+const sdk = new SDK({
+  auth: { type: 'apiKey', apiKey: 'key_...' },
+  origin: 'my-app',
+  // retry is enabled by default with these values:
+  retry: {
+    enabled: true,
+    maxRetries: 3,
+    initialDelay: 1000,
+    maxDelay: 30000
+  }
+});
+```
+
+```typescript Custom Retry
+const sdk = new SDK({
+  auth: { type: 'apiKey', apiKey: 'key_...' },
+  origin: 'my-app',
+  retry: {
+    enabled: true,
+    maxRetries: 5,
+    initialDelay: 2000,
+    maxDelay: 60000
+  }
+});
+```
+
+```typescript Disable Retry
+const sdk = new SDK({
+  auth: { type: 'apiKey', apiKey: 'key_...' },
+  origin: 'my-app',
+  retry: {
+    enabled: false
+  }
+});
+```
+</CodeGroup>
+
+## Configuration Examples
+
+### Production Backend Service
+
+```typescript Node.js API
+import { SDK } from '@bloque/sdk';
+
+const sdk = new SDK({
+  auth: {
+    type: 'apiKey',
+    apiKey: process.env.BLOQUE_API_KEY
+  },
+  origin: process.env.BLOQUE_ORIGIN,
+  mode: 'production',
+  timeout: 30000,
+  retry: {
+    enabled: true,
+    maxRetries: 3
+  }
+});
+```
+
+### Frontend Web Application
+
+```typescript Browser with httpOnly Cookies
+import { SDK } from '@bloque/sdk';
+
+const sdk = new SDK({
+  platform: 'browser',
+  auth: { type: 'jwt' },
+  origin: 'my-web-app',
+  mode: 'production'
+  // tokenStorage not needed - uses httpOnly cookies
+});
+```
+
+### Mobile Application
+
+```typescript React Native
+import { SDK } from '@bloque/sdk';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const sdk = new SDK({
+  platform: 'react-native',
+  auth: { type: 'jwt' },
+  origin: 'my-mobile-app',
+  mode: 'production',
+  tokenStorage: {
+    get: () => AsyncStorage.getItem('bloque_token'),
+    set: (token) => AsyncStorage.setItem('bloque_token', token),
+    clear: () => AsyncStorage.removeItem('bloque_token')
+  },
+  timeout: 45000 // Mobile networks may be slower
+});
+```
+
+### Development/Testing
+
+```typescript Sandbox Mode
+import { SDK } from '@bloque/sdk';
+
+const sdk = new SDK({
+  auth: {
+    type: 'apiKey',
+    apiKey: process.env.BLOQUE_TEST_API_KEY
+  },
+  origin: 'test-origin',
+  mode: 'sandbox',
+  timeout: 60000, // Longer timeout for debugging
+  retry: {
+    enabled: false // Disable retries to see errors immediately
+  }
+});
+```
+
+## Configuration Validation
+
+The SDK validates configuration at initialization and throws `BloqueConfigError` for invalid configurations:
+
+```typescript Invalid Configurations
+// Error: Cannot specify both mode and baseUrl
+const sdk = new SDK({
+  mode: 'production',
+  baseUrl: 'https://custom.com', // ❌
+  auth: { type: 'apiKey', apiKey: 'key_...' }
+});
+
+// Error: JWT auth required for browser platform
+const sdk = new SDK({
+  platform: 'browser',
+  auth: { type: 'apiKey', apiKey: 'key_...' } // ❌
+});
+
+// Error: tokenStorage required for react-native with JWT
+const sdk = new SDK({
+  platform: 'react-native',
+  auth: { type: 'jwt' }
+  // ❌ Missing tokenStorage
+});
+```
+
+## TypeScript Types
+
+The configuration is fully typed. Import types for better IDE support:
+
+```typescript
+import type { BloqueSDKConfig, Platform, Mode, TokenStorage } from '@bloque/sdk-core';
+
+const config: BloqueSDKConfig = {
+  auth: { type: 'apiKey', apiKey: 'key_...' },
+  origin: 'my-app',
+  platform: 'node',
+  mode: 'production'
+};
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Platform Support" icon="server" href="/concepts/platform-support">
+    Learn about platform-specific features
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/concepts/error-handling">
+    Handle configuration and runtime errors
+  </Card>
+  <Card title="Authentication" icon="key" href="/quickstart">
+    Connect and authenticate users
+  </Card>
+  <Card title="URNs" icon="fingerprint" href="/concepts/urns">
+    Understand Bloque's URN system
+  </Card>
+</CardGroup>

@@ -1,80 +1,278 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: 'Quickstart'
+description: 'Get up and running with the Bloque SDK in under 5 minutes'
 ---
 
-## Get started in three steps
+Get started with the Bloque SDK by creating your first virtual card account. This guide will take you from installation to making your first API call.
 
-Get your documentation site running locally and make your first customization.
+## What You'll Build
 
-### Step 1: Set up your local environment
+In this quickstart, you'll:
+- Install the Bloque SDK
+- Configure authentication
+- Register a new user
+- Create a virtual account
+- Issue a virtual card
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+## Before You Start
 
-### Step 2: Deploy your changes
+You'll need:
+- Node.js 22+ (or Bun, Deno)
+- A Bloque API key (contact [Bloque](https://www.bloque.app) to get started)
+- Your origin identifier
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+<Steps>
+  <Step title="Install the SDK">
+    Install the Bloque SDK using your preferred package manager:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    <CodeGroup>
+    ```bash npm
+    npm install @bloque/sdk
+    ```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```bash yarn
+    yarn add @bloque/sdk
+    ```
 
-### Step 3: Go live
+    ```bash pnpm
+    pnpm add @bloque/sdk
+    ```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    ```bash bun
+    bun add @bloque/sdk
+    ```
+    </CodeGroup>
+  </Step>
 
-## Next steps
+  <Step title="Set up your credentials">
+    Create a `.env` file in your project root with your credentials:
 
-Now that you have your docs running, explore these key features:
+    ```bash .env
+    BLOQUE_API_KEY=your_api_key_here
+    BLOQUE_ORIGIN=your-origin
+    ```
+
+    <Warning>
+      Never commit your API key to version control. Always use environment variables for credentials.
+    </Warning>
+  </Step>
+
+  <Step title="Initialize the SDK">
+    Create a new file and import the SDK:
+
+    ```typescript index.ts
+    import { SDK } from '@bloque/sdk';
+
+    const bloque = new SDK({
+      origin: process.env.BLOQUE_ORIGIN!,
+      auth: {
+        type: 'apiKey',
+        apiKey: process.env.BLOQUE_API_KEY!,
+      },
+      mode: 'sandbox', // Use 'production' when ready
+    });
+    ```
+
+    <Info>
+      Start with `sandbox` mode for testing. Switch to `production` when you're ready to go live.
+    </Info>
+  </Step>
+
+  <Step title="Register a new user">
+    Register a new user identity:
+
+    ```typescript
+    const session = await bloque.register('user@example.com', {
+      firstName: 'John',
+      lastName: 'Doe',
+      profile: {
+        type: 'individual',
+        dateOfBirth: '1990-01-01',
+        governmentIdNumber: '123456789',
+      },
+    });
+
+    console.log('User registered:', session.urn);
+    // "did:bloque:your-origin:user@example.com"
+    ```
+
+    The `register()` method:
+    - Creates a new identity with the given alias (email, phone, or custom ID)
+    - Returns a session object with access to all API clients
+    - Automatically authenticates the user
+  </Step>
+
+  <Step title="Create a virtual account">
+    Create a virtual account for testing:
+
+    ```typescript
+    const virtualAccount = await session.accounts.virtual.create({
+      name: 'Test Account',
+      metadata: {
+        purpose: 'testing',
+      },
+    });
+
+    console.log('Account created:', virtualAccount.urn);
+    console.log('Status:', virtualAccount.status);
+    ```
+  </Step>
+
+  <Step title="Issue a virtual card">
+    Create a virtual card for making payments:
+
+    ```typescript
+    const card = await session.accounts.card.create({
+      name: 'My Virtual Card',
+      metadata: {
+        purpose: 'online-shopping',
+      },
+    });
+
+    console.log('Card created:', card.urn);
+    console.log('Last four digits:', card.lastFour);
+    console.log('Status:', card.status);
+    console.log('Details URL:', card.detailsUrl);
+    ```
+
+    The card is now ready to use for transactions!
+  </Step>
+</Steps>
+
+## Complete Example
+
+Here's the full code for reference:
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+async function main() {
+  // Initialize SDK
+  const bloque = new SDK({
+    origin: process.env.BLOQUE_ORIGIN!,
+    auth: {
+      type: 'apiKey',
+      apiKey: process.env.BLOQUE_API_KEY!,
+    },
+    mode: 'sandbox',
+  });
+
+  // Register a new user
+  const session = await bloque.register('user@example.com', {
+    firstName: 'John',
+    lastName: 'Doe',
+    profile: {
+      type: 'individual',
+      dateOfBirth: '1990-01-01',
+      governmentIdNumber: '123456789',
+    },
+  });
+
+  console.log('User registered:', session.urn);
+
+  // Create a virtual account
+  const account = await session.accounts.virtual.create({
+    name: 'Test Account',
+  });
+
+  console.log('Account created:', account.urn);
+
+  // Create a virtual card
+  const card = await session.accounts.card.create({
+    name: 'My Virtual Card',
+  });
+
+  console.log('Card created:', card.urn);
+  console.log('Last four:', card.lastFour);
+}
+
+main().catch(console.error);
+```
+
+## Connecting to Existing Users
+
+Once a user is registered, use `connect()` instead of `register()`:
+
+```typescript
+const bloque = new SDK({
+  origin: process.env.BLOQUE_ORIGIN!,
+  auth: {
+    type: 'apiKey',
+    apiKey: process.env.BLOQUE_API_KEY!,
+  },
+  mode: 'sandbox',
+});
+
+// Connect to existing user
+const session = await bloque.connect('user@example.com');
+
+// Now you can use all the same APIs
+const cards = await session.accounts.card.list();
+console.log(`User has ${cards.accounts.length} cards`);
+```
+
+## Next Steps
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card
+    title="Explore Accounts"
+    icon="wallet"
+    href="/accounts/overview"
+  >
+    Learn about card accounts, Polygon wallets, and more
+  </Card>
+  <Card
+    title="Authentication"
+    icon="key"
+    href="/authentication"
+  >
+    Understand API key and JWT authentication
+  </Card>
+  <Card
+    title="Swap & Exchange"
+    icon="money-bill-transfer"
+    href="/swap/overview"
+  >
+    Add currency exchange and swap functionality
+  </Card>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api/sdk"
+  >
+    Explore the complete API documentation
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Authentication Error: Invalid API Key">
+    Make sure your API key is correct and has the proper format. Check that:
+    - The API key is set in your environment variables
+    - There are no extra spaces or quotes in the `.env` file
+    - You're using the correct key for sandbox vs production
+  </Accordion>
+
+  <Accordion title="Validation Error: Alias already exists">
+    The alias (email/phone) is already registered. Use `connect()` instead of `register()`:
+    
+    ```typescript
+    const session = await bloque.connect('user@example.com');
+    ```
+  </Accordion>
+
+  <Accordion title="Network Error: Connection timeout">
+    Check your internet connection and firewall settings. If you're behind a corporate proxy, you may need to configure proxy settings.
+  </Accordion>
+
+  <Accordion title="TypeError: Cannot read property of undefined">
+    Ensure you've installed all dependencies:
+    
+    ```bash
+    npm install @bloque/sdk
+    ```
+    
+    And that you're using Node.js 22 or higher.
+  </Accordion>
+</AccordionGroup>

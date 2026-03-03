@@ -1,0 +1,271 @@
+---
+title: Platform Support
+description: Multi-platform support across Node.js, Bun, Deno, browsers, and React Native
+---
+
+The Bloque SDK is designed to work seamlessly across multiple JavaScript runtimes and environments. Each platform has specific characteristics and recommended authentication methods.
+
+## Supported Platforms
+
+The SDK supports five platforms via the `platform` configuration option:
+
+<CodeGroup>
+```typescript Node.js
+import { SDK } from '@bloque/sdk';
+
+const sdk = new SDK({
+  platform: 'node',
+  auth: { type: 'apiKey', apiKey: process.env.BLOQUE_API_KEY },
+  origin: 'your-origin'
+});
+```
+
+```typescript Bun
+import { SDK } from '@bloque/sdk';
+
+const sdk = new SDK({
+  platform: 'bun',
+  auth: { type: 'apiKey', apiKey: process.env.BLOQUE_API_KEY },
+  origin: 'your-origin'
+});
+```
+
+```typescript Deno
+import { SDK } from '@bloque/sdk';
+
+const sdk = new SDK({
+  platform: 'deno',
+  auth: { type: 'apiKey', apiKey: Deno.env.get('BLOQUE_API_KEY') },
+  origin: 'your-origin'
+});
+```
+
+```typescript Browser
+import { SDK } from '@bloque/sdk';
+
+const sdk = new SDK({
+  platform: 'browser',
+  auth: { type: 'jwt' },
+  origin: 'your-origin'
+});
+```
+
+```typescript React Native
+import { SDK } from '@bloque/sdk';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const sdk = new SDK({
+  platform: 'react-native',
+  auth: { type: 'jwt' },
+  origin: 'your-origin',
+  tokenStorage: {
+    get: async () => await AsyncStorage.getItem('bloque_token'),
+    set: async (token) => await AsyncStorage.setItem('bloque_token', token),
+    clear: async () => await AsyncStorage.removeItem('bloque_token')
+  }
+});
+```
+</CodeGroup>
+
+## Backend Platforms
+
+Backend platforms support private API key authentication and are intended for server-side environments.
+
+### Node.js
+
+<Info>
+Node.js is the default platform if not specified.
+</Info>
+
+**Typical use cases:**
+- APIs and web services
+- Backend services
+- Server-side workers
+- Microservices
+
+**Authentication:**
+- Supports private API keys
+- API keys should be stored as environment variables
+- Never expose API keys in client-side code
+
+### Bun
+
+**Typical use cases:**
+- High-performance backend services
+- Local development servers
+- Server-side applications requiring fast startup times
+
+**Authentication:**
+- Supports private API keys
+- Environment variables are automatically loaded from `.env` files
+
+### Deno
+
+**Typical use cases:**
+- Serverless functions
+- Edge-like services
+- Secure server-side applications
+
+**Authentication:**
+- Supports private API keys
+- Access environment variables via `Deno.env.get()`
+
+## Frontend Platforms
+
+Frontend platforms use JWT authentication and are designed for client-side environments where private API keys cannot be safely stored.
+
+### Browser
+
+**Characteristics:**
+- No access to private API keys
+- Authentication performed via JWT
+- Requests include `credentials: 'include'` to support httpOnly cookies
+- `tokenStorage` is optional (recommended to use httpOnly cookies)
+
+**Security considerations:**
+
+<Warning>
+If using localStorage or sessionStorage for token storage, be aware that tokens are vulnerable to XSS attacks. Use httpOnly cookies whenever possible.
+</Warning>
+
+```typescript Example: httpOnly Cookie Storage
+const cookieStorage = {
+  get: () => {
+    // Token is automatically sent in httpOnly cookie
+    // You may need to fetch from server or return null
+    return null;
+  },
+  set: (token) => {
+    // Send to server to set httpOnly cookie
+    fetch('/api/auth/set-token', {
+      method: 'POST',
+      body: JSON.stringify({ token })
+    });
+  },
+  clear: () => {
+    // Call server to clear cookie
+    fetch('/api/auth/logout', { method: 'POST' });
+  }
+};
+
+const sdk = new SDK({
+  platform: 'browser',
+  auth: { type: 'jwt' },
+  tokenStorage: cookieStorage
+});
+```
+
+### React Native
+
+**Characteristics:**
+- No access to private API keys
+- Authentication performed via JWT
+- `tokenStorage` is **required** to provide/store the JWT token
+- Should use platform-specific secure storage
+
+**Recommended storage solutions:**
+
+<CardGroup cols={2}>
+  <Card title="AsyncStorage" icon="database">
+    `@react-native-async-storage/async-storage` for simple persistence
+  </Card>
+  <Card title="Secure Store" icon="lock">
+    `expo-secure-store` or platform-specific Keychain/Keystore for sensitive data
+  </Card>
+</CardGroup>
+
+```typescript Example: AsyncStorage
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const tokenStorage = {
+  get: async () => {
+    return await AsyncStorage.getItem('bloque_token');
+  },
+  set: async (token: string) => {
+    await AsyncStorage.setItem('bloque_token', token);
+  },
+  clear: async () => {
+    await AsyncStorage.removeItem('bloque_token');
+  }
+};
+
+const sdk = new SDK({
+  platform: 'react-native',
+  auth: { type: 'jwt' },
+  origin: 'your-origin',
+  tokenStorage
+});
+```
+
+```typescript Example: Expo Secure Store
+import * as SecureStore from 'expo-secure-store';
+
+const tokenStorage = {
+  get: async () => {
+    return await SecureStore.getItemAsync('bloque_token');
+  },
+  set: async (token: string) => {
+    await SecureStore.setItemAsync('bloque_token', token);
+  },
+  clear: async () => {
+    await SecureStore.deleteItemAsync('bloque_token');
+  }
+};
+```
+
+## Platform Detection
+
+If you don't specify a `platform`, the SDK defaults to `'node'`. For cross-platform libraries, you can detect the platform programmatically:
+
+```typescript Auto-detect Platform
+function detectPlatform() {
+  if (typeof window !== 'undefined') return 'browser';
+  if (typeof Deno !== 'undefined') return 'deno';
+  if (typeof Bun !== 'undefined') return 'bun';
+  // Check for React Native
+  if (typeof navigator !== 'undefined' && navigator.product === 'ReactNative') {
+    return 'react-native';
+  }
+  return 'node';
+}
+
+const sdk = new SDK({
+  platform: detectPlatform(),
+  // ... other config
+});
+```
+
+## Platform Compatibility
+
+The SDK validates platform and authentication compatibility at runtime:
+
+<AccordionGroup>
+  <Accordion title="Backend platforms (node, bun, deno)">
+    - Can use `apiKey` or `jwt` authentication
+    - API key authentication is recommended
+    - `tokenStorage` is optional for JWT auth
+  </Accordion>
+  
+  <Accordion title="Browser platform">
+    - Must use `jwt` authentication
+    - Cannot use API key authentication
+    - `tokenStorage` is optional (uses httpOnly cookies by default)
+  </Accordion>
+  
+  <Accordion title="React Native platform">
+    - Must use `jwt` authentication
+    - Cannot use API key authentication
+    - `tokenStorage` is **required**
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/concepts/configuration">
+    Learn about all SDK configuration options
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/concepts/error-handling">
+    Handle platform-specific errors
+  </Card>
+</CardGroup>

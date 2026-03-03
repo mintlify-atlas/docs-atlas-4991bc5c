@@ -1,0 +1,211 @@
+---
+title: Aliases
+description: Manage and look up identity aliases in the Bloque platform
+---
+
+## Overview
+
+Aliases are human-readable identifiers associated with identities in the Bloque platform. They serve as convenient references to user accounts and can be used for lookups, transfers, and identity verification.
+
+## What is an Alias?
+
+An alias can be any unique identifier associated with an identity:
+
+- **Email addresses**: `user@example.com`
+- **Phone numbers**: `+1234567890`
+- **Blockchain addresses**: `0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6`
+- **Custom identifiers**: Application-specific usernames or IDs
+
+## Alias Structure
+
+Each alias contains detailed information about the identity it represents:
+
+```typescript identity/src/internal/wire-types.ts
+type AliasResponse = {
+  id: string;                           // Unique alias ID
+  alias: string;                        // The alias value
+  type: 'phone' | 'email' | string;     // Alias type
+  urn: string;                          // Associated identity URN
+  origin: string;                       // Origin namespace
+  details: {
+    phone?: string;                     // Phone number (for phone aliases)
+  };
+  metadata: {
+    alias: string;
+    [key: string]: unknown;
+  };
+  status: 'active' | 'inactive' | 'revoked';
+  is_public: boolean;                   // Whether alias is publicly visible
+  is_primary: boolean;                  // Whether this is the primary alias
+  created_at: string;                   // ISO 8601 timestamp
+  updated_at: string;                   // ISO 8601 timestamp
+}
+```
+
+## Get Alias Information
+
+Look up detailed information about an alias:
+
+```typescript
+const alias = await bloque.identity.aliases.get('user@example.com');
+
+console.log(alias.urn);        // Identity URN
+console.log(alias.origin);     // Origin namespace
+console.log(alias.type);       // 'email'
+console.log(alias.status);     // 'active'
+console.log(alias.is_primary); // true
+```
+
+### Example: Email Alias Lookup
+
+```typescript
+const emailAlias = await bloque.identity.aliases.get('john.doe@example.com');
+
+if (emailAlias.status === 'active') {
+  console.log('User URN:', emailAlias.urn);
+  console.log('Origin:', emailAlias.origin);
+  console.log('Primary alias:', emailAlias.is_primary);
+}
+```
+
+### Example: Phone Number Lookup
+
+```typescript
+const phoneAlias = await bloque.identity.aliases.get('+1234567890');
+
+console.log('Phone:', phoneAlias.details.phone);
+console.log('User URN:', phoneAlias.urn);
+```
+
+### Example: Blockchain Address Lookup
+
+```typescript
+const walletAlias = await bloque.identity.aliases.get(
+  '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6'
+);
+
+console.log('Wallet address verified');
+console.log('Associated identity:', walletAlias.urn);
+console.log('Origin:', walletAlias.origin); // e.g., 'ethereum-mainnet'
+```
+
+## Alias Status
+
+Aliases can have different statuses:
+
+| Status | Description |
+|--------|-------------|
+| `active` | Alias is active and can be used |
+| `inactive` | Alias is temporarily inactive |
+| `revoked` | Alias has been permanently revoked |
+
+## Primary vs Secondary Aliases
+
+Each identity can have multiple aliases, but only one can be marked as primary:
+
+```typescript
+const alias = await bloque.identity.aliases.get('user@example.com');
+
+if (alias.is_primary) {
+  console.log('This is the primary alias for the identity');
+}
+```
+
+## Public vs Private Aliases
+
+Aliases can be public or private:
+
+- **Public aliases** (`is_public: true`) - Visible in public directories and lookups
+- **Private aliases** (`is_public: false`) - Only visible to the identity owner and authorized parties
+
+```typescript
+const alias = await bloque.identity.aliases.get('user@example.com');
+
+if (alias.is_public) {
+  console.log('This alias is publicly discoverable');
+}
+```
+
+## Use Cases
+
+<AccordionGroup>
+  <Accordion title="Payment Recipient Lookup">
+    Before sending payments, look up the recipient's alias to verify their identity:
+    
+    ```typescript
+    const recipient = await bloque.identity.aliases.get('recipient@example.com');
+    
+    if (recipient.status === 'active') {
+      // Proceed with payment using recipient.urn
+      await bloque.accounts.virtual.transfer({
+        fromAccountUrn: senderAccount,
+        toHolderUrn: recipient.urn,
+        amount: '100.00',
+        currency: 'USD'
+      });
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="User Verification">
+    Verify a user's alias during registration or authentication:
+    
+    ```typescript
+    const alias = await bloque.identity.aliases.get(userEmail);
+    
+    if (alias.status === 'active' && alias.origin === 'bloque-email') {
+      console.log('Email verified and active');
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Multi-Chain Identity">
+    Check if a blockchain address is associated with a Bloque identity:
+    
+    ```typescript
+    const walletAlias = await bloque.identity.aliases.get(walletAddress);
+    
+    console.log('Wallet origin:', walletAlias.origin);
+    console.log('Identity URN:', walletAlias.urn);
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Error Handling
+
+```typescript
+import { BloqueNotFoundError } from '@bloque/sdk-core';
+
+try {
+  const alias = await bloque.identity.aliases.get('unknown@example.com');
+} catch (error) {
+  if (error instanceof BloqueNotFoundError) {
+    console.log('Alias not found');
+  }
+}
+```
+
+## Best Practices
+
+<Warning>
+  Always validate alias status before using it for critical operations like payments or access control.
+</Warning>
+
+<Tip>
+  Use the URN (from alias.urn) as the canonical identifier for identities, not the alias itself. Aliases can change, but URNs are permanent.
+</Tip>
+
+<Note>
+  Alias lookups are case-sensitive for most types. Normalize email addresses and other identifiers before lookup.
+</Note>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Origins" icon="shield-check" href="/identity/origins">
+    Register identities and manage origins
+  </Card>
+  <Card title="Identity Overview" icon="user" href="/identity/overview">
+    Learn about identity management
+  </Card>
+</CardGroup>

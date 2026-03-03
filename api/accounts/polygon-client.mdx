@@ -1,0 +1,297 @@
+---
+title: PolygonClient
+description: API reference for PolygonClient methods
+---
+
+The `PolygonClient` provides methods to manage Polygon cryptocurrency accounts.
+
+## create()
+
+Create a new Polygon account.
+
+```typescript
+await bloque.accounts.polygon.create(
+  params?: CreatePolygonAccountParams,
+  options?: CreateAccountOptions
+): Promise<PolygonAccount>
+```
+
+### Parameters
+
+<ParamField path="params" type="CreatePolygonAccountParams" optional>
+  Polygon account creation parameters
+  
+  <Expandable title="properties">
+    <ParamField path="name" type="string" optional>
+      Display name for the polygon account
+    </ParamField>
+    
+    <ParamField path="ledgerId" type="string" optional>
+      Ledger account ID to associate with the polygon account. If not provided, a new ledger account will be created automatically.
+    </ParamField>
+    
+    <ParamField path="webhookUrl" type="string" optional>
+      Webhook URL to receive account events
+    </ParamField>
+    
+    <ParamField path="metadata" type="Record<string, string>" optional>
+      Custom metadata to attach to the polygon account (all values must be strings)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="options" type="CreateAccountOptions" optional>
+  Creation options
+  
+  <Expandable title="properties">
+    <ParamField path="waitLedger" type="boolean" optional>
+      Wait for account to become active before returning
+    </ParamField>
+    
+    <ParamField path="timeout" type="number" optional>
+      Timeout in milliseconds (default: 60000)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="PolygonAccount" type="object">
+  <Expandable title="properties">
+    <ResponseField name="urn" type="string">
+      Unique resource name for the polygon account
+    </ResponseField>
+    
+    <ResponseField name="id" type="string">
+      Account ID
+    </ResponseField>
+    
+    <ResponseField name="address" type="string">
+      Polygon wallet address
+    </ResponseField>
+    
+    <ResponseField name="network" type="string">
+      Network name (always "polygon")
+    </ResponseField>
+    
+    <ResponseField name="status" type="'creation_in_progress' | 'active' | 'disabled' | 'frozen' | 'deleted' | 'creation_failed'">
+      Account status
+    </ResponseField>
+    
+    <ResponseField name="ownerUrn" type="string">
+      Owner URN
+    </ResponseField>
+    
+    <ResponseField name="ledgerId" type="string">
+      Ledger account ID associated with the polygon account
+    </ResponseField>
+    
+    <ResponseField name="webhookUrl" type="string | null">
+      Webhook URL (if configured)
+    </ResponseField>
+    
+    <ResponseField name="metadata" type="Record<string, string>" optional>
+      Custom metadata
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      Creation timestamp
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      Last update timestamp
+    </ResponseField>
+    
+    <ResponseField name="balance" type="object" optional>
+      Token balances (optional, included in list responses and after creation)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```typescript
+// Create without waiting
+const account = await bloque.accounts.polygon.create();
+
+// Create and wait for active status
+const account = await bloque.accounts.polygon.create({}, { waitLedger: true });
+```
+
+## list()
+
+List Polygon accounts.
+
+```typescript
+await bloque.accounts.polygon.list(
+  params?: ListPolygonAccountsParams
+): Promise<ListPolygonAccountsResult>
+```
+
+### Parameters
+
+<ParamField path="params" type="ListPolygonAccountsParams" optional>
+  List parameters
+  
+  <Expandable title="properties">
+    <ParamField path="urn" type="string" optional>
+      URN of a specific polygon account to retrieve
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="ListPolygonAccountsResult" type="object">
+  <Expandable title="properties">
+    <ResponseField name="accounts" type="PolygonAccount[]">
+      Array of polygon accounts with balance information
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```typescript
+// List all polygon accounts
+const result = await bloque.accounts.polygon.list();
+
+// Get a specific polygon account
+const result = await bloque.accounts.polygon.list({
+  urn: 'did:bloque:account:polygon:0x05B10c9B6241b73fc8c906fB7979eFc7764AB731'
+});
+```
+
+## updateMetadata()
+
+Update polygon account metadata.
+
+```typescript
+await bloque.accounts.polygon.updateMetadata(
+  params: UpdatePolygonMetadataParams
+): Promise<PolygonAccount>
+```
+
+### Parameters
+
+<ParamField path="params" type="UpdatePolygonMetadataParams">
+  Metadata update parameters
+  
+  <Expandable title="properties">
+    <ParamField path="urn" type="string" required>
+      URN of the polygon account to update
+    </ParamField>
+    
+    <ParamField path="metadata" type="Record<string, string>" required>
+      Metadata to update (source is a reserved field and cannot be modified)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="PolygonAccount" type="object">
+  Updated polygon account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.polygon.updateMetadata({
+  urn: 'did:bloque:account:polygon:0x05B10c9B6241b73fc8c906fB7979eFc7764AB731',
+  metadata: {
+    updated_by: 'admin',
+    update_reason: 'testing_update'
+  }
+});
+```
+
+## activate()
+
+Activate a Polygon account.
+
+```typescript
+await bloque.accounts.polygon.activate(
+  urn: string
+): Promise<PolygonAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  Polygon account URN
+</ParamField>
+
+### Returns
+
+<ResponseField name="PolygonAccount" type="object">
+  Updated polygon account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.polygon.activate(
+  'did:bloque:account:polygon:0x05B10c9B6241b73fc8c906fB7979eFc7764AB731'
+);
+```
+
+## freeze()
+
+Freeze a Polygon account.
+
+```typescript
+await bloque.accounts.polygon.freeze(
+  urn: string
+): Promise<PolygonAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  Polygon account URN
+</ParamField>
+
+### Returns
+
+<ResponseField name="PolygonAccount" type="object">
+  Updated polygon account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.polygon.freeze(
+  'did:bloque:account:polygon:0x05B10c9B6241b73fc8c906fB7979eFc7764AB731'
+);
+```
+
+## disable()
+
+Disable a Polygon account.
+
+```typescript
+await bloque.accounts.polygon.disable(
+  urn: string
+): Promise<PolygonAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  Polygon account URN
+</ParamField>
+
+### Returns
+
+<ResponseField name="PolygonAccount" type="object">
+  Updated polygon account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.polygon.disable(
+  'did:bloque:account:polygon:0x05B10c9B6241b73fc8c906fB7979eFc7764AB731'
+);
+```

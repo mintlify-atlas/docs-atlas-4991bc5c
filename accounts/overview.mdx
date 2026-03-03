@@ -1,0 +1,281 @@
+---
+title: 'Accounts Overview'
+description: 'Learn about the Bloque SDK Accounts API and different account types'
+---
+
+## Introduction
+
+The Bloque SDK Accounts API provides a unified interface for managing multiple types of financial accounts and payment methods. All account types are accessible through the `AccountsClient`, which provides both general account operations and specialized sub-clients for each account type.
+
+## Account Types
+
+Bloque supports five different account mediums:
+
+<CardGroup cols={2}>
+  <Card title="Virtual Cards" icon="credit-card" href="/accounts/card">
+    Virtual and physical debit/credit cards for everyday spending
+  </Card>
+  <Card title="Virtual Accounts" icon="wallet" href="/accounts/virtual">
+    Simple digital accounts for testing and development
+  </Card>
+  <Card title="Polygon Wallets" icon="link" href="/accounts/polygon">
+    Cryptocurrency wallets on the Polygon blockchain network
+  </Card>
+  <Card title="Bancolombia" icon="building-columns" href="/accounts/bancolombia">
+    Bancolombia bank accounts for Colombian users
+  </Card>
+  <Card title="US Bank Accounts" icon="landmark" href="/accounts/us-accounts">
+    FDIC-insured US bank accounts for individuals and businesses
+  </Card>
+</CardGroup>
+
+## AccountsClient
+
+The `AccountsClient` is the main entry point for all account operations. It provides:
+
+- **General operations**: Balance queries, transfers, transaction history across all account types
+- **Sub-clients**: Specialized clients for each account medium (card, virtual, polygon, bancolombia, us)
+
+### Accessing AccountsClient
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  auth: {
+    type: 'apiKey',
+    apiKey: process.env.BLOQUE_API_KEY,
+  },
+});
+
+const user = await bloque.connect('@username');
+
+// Access general account operations
+const balances = await user.accounts.balances();
+
+// Access sub-clients for specific account types
+const cards = await user.accounts.card.list();
+const virtualAccounts = await user.accounts.virtual.list();
+const polygonWallets = await user.accounts.polygon.list();
+```
+
+## Common Operations
+
+### Get Account Balances
+
+Retrieve aggregated balances across all accounts for the authenticated user:
+
+```typescript
+const balances = await user.accounts.balances();
+
+// Balances are grouped by asset
+console.log(balances['DUSD/6']?.current); // Current DUSD balance
+console.log(balances['KSM/12']?.current); // Current KSM balance
+```
+
+### Get Account Balance by URN
+
+Retrieve balance for a specific account:
+
+```typescript
+const balance = await user.accounts.balance(
+  'did:bloque:account:virtual:acc-12345'
+);
+
+Object.entries(balance).forEach(([asset, b]) => {
+  console.log(`${asset}: current=${b.current}, pending=${b.pending}`);
+});
+```
+
+### Transfer Funds
+
+Transfer funds between any two accounts:
+
+```typescript
+const transfer = await user.accounts.transfer({
+  sourceUrn: 'did:bloque:account:card:usr-123:crd-456',
+  destinationUrn: 'did:bloque:account:virtual:acc-67890',
+  amount: '1000000000000',
+  asset: 'KSM/12',
+  metadata: {
+    reference: 'payment-123',
+    note: 'Monthly subscription'
+  }
+});
+
+console.log(transfer.queueId); // Queue ID for tracking
+console.log(transfer.status);  // 'queued' | 'processing' | 'completed' | 'failed'
+```
+
+### Batch Transfers
+
+Execute multiple transfers in a single batch operation:
+
+```typescript
+const result = await user.accounts.batchTransfer({
+  reference: 'batch-payroll-2024-01-15',
+  operations: [
+    {
+      fromUrn: 'did:bloque:account:virtual:acc-12345',
+      toUrn: 'did:bloque:account:virtual:acc-67890',
+      reference: 'transfer-001',
+      amount: '1000000000000',
+      asset: 'KSM/12',
+      metadata: { note: 'Payment for order #123' }
+    },
+    {
+      fromUrn: 'did:bloque:account:virtual:acc-12345',
+      toUrn: 'did:bloque:account:card:usr-456:crd-789',
+      reference: 'transfer-002',
+      amount: '500000000000',
+      asset: 'KSM/12'
+    }
+  ],
+  metadata: { batch_id: 'batch-2024-01-15' },
+  webhookUrl: 'https://api.example.com/webhooks/batch-settlement'
+});
+
+console.log(`Processed ${result.totalOperations} operations in ${result.totalChunks} chunks`);
+```
+
+<Note>
+Large batches are automatically split into chunks of max 80 operations each.
+</Note>
+
+### List Accounts
+
+Retrieve all accounts for the authenticated user:
+
+```typescript
+const { accounts } = await user.accounts.list();
+
+// Each account is typed according to its medium
+accounts.forEach(account => {
+  console.log(account.urn, account.status);
+  
+  // TypeScript narrows the type based on account structure
+  if ('lastFour' in account) {
+    // CardAccount
+    console.log('Card ending in', account.lastFour);
+  } else if ('address' in account && 'network' in account) {
+    // PolygonAccount
+    console.log('Polygon wallet', account.address);
+  }
+});
+```
+
+### Get Specific Account
+
+Retrieve details for a specific account by URN:
+
+```typescript
+const account = await user.accounts.get(
+  'did:bloque:account:virtual:acc-12345'
+);
+
+console.log(account.status);
+console.log(account.balance);
+```
+
+### Account Movements
+
+Retrieve transaction history for a specific account:
+
+```typescript
+const { data, pageSize, hasMore, next } = await user.accounts.movements({
+  urn: 'did:bloque:account:card:usr-123:crd-456',
+  asset: 'DUSD/6',
+  limit: 50,
+  direction: 'in', // Filter for incoming transactions
+  after: '2025-01-01T00:00:00Z',
+});
+
+data.forEach(movement => {
+  console.log(
+    movement.type,
+    movement.amount,
+    movement.direction,
+    movement.status
+  );
+});
+
+// Fetch next page if available
+if (hasMore && next) {
+  const nextPage = await user.accounts.movements({
+    urn: 'did:bloque:account:card:usr-123:crd-456',
+    asset: 'DUSD/6',
+    next,
+  });
+}
+```
+
+### Global Transactions
+
+Retrieve transactions across all accounts (doesn't require account URN):
+
+```typescript
+const { data, hasMore, next } = await user.accounts.transactions({
+  asset: 'DUSD/6',
+  limit: 10,
+  pocket: 'main', // 'main' for confirmed, 'pending' for pending
+});
+
+if (hasMore && next) {
+  const nextPage = await user.accounts.transactions({
+    asset: 'DUSD/6',
+    next,
+  });
+}
+```
+
+## Account Status
+
+All accounts share common status values:
+
+- `creation_in_progress` - Account is being created
+- `active` - Account is active and can be used
+- `disabled` - Account is disabled
+- `frozen` - Account is frozen (temporary)
+- `deleted` - Account has been deleted
+- `creation_failed` - Account creation failed
+
+## Supported Assets
+
+The Bloque SDK supports the following assets:
+
+- `DUSD/6` - Digital USD (6 decimals)
+- `KSM/12` - Kusama (12 decimals)
+
+Asset identifiers follow the format `{SYMBOL}/{DECIMALS}`.
+
+## URN Format
+
+All accounts are identified by a Uniform Resource Name (URN) following this pattern:
+
+```
+did:bloque:account:{medium}:{identifier}
+```
+
+Examples:
+- Card: `did:bloque:account:card:usr-123:crd-456`
+- Virtual: `did:bloque:account:virtual:acc-12345`
+- Polygon: `did:bloque:account:polygon:0x05B10c9B6241b73fc8c906fB7979eFc7764AB731`
+- Bancolombia: `did:bloque:account:bancolombia:abc-123`
+- US Account: `did:bloque:account:us-account:usr-123:us-456`
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Virtual Cards" icon="credit-card" href="/accounts/card">
+    Learn about creating and managing virtual cards
+  </Card>
+  <Card title="Virtual Accounts" icon="wallet" href="/accounts/virtual">
+    Create simple digital accounts for testing
+  </Card>
+  <Card title="Polygon Wallets" icon="link" href="/accounts/polygon">
+    Set up cryptocurrency wallets
+  </Card>
+  <Card title="US Bank Accounts" icon="landmark" href="/accounts/us-accounts">
+    Create FDIC-insured bank accounts
+  </Card>
+</CardGroup>

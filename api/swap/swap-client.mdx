@@ -1,0 +1,331 @@
+---
+title: SwapClient
+description: Exchange rate discovery and swap operations
+---
+
+## Overview
+
+The `SwapClient` provides access to exchange rate discovery and swapping functionality for the Bloque platform. It serves as the main entry point for:
+
+- Finding available exchange rates between asset pairs
+- Accessing PSE payment utilities
+- Managing generic bank transfer cash-outs to Colombian banks
+
+## Constructor
+
+The `SwapClient` is automatically initialized when you create a Bloque SDK instance. Access it via `bloque.swap`.
+
+```typescript
+import { Bloque } from '@bloque/sdk';
+
+const bloque = new Bloque({ apiKey: 'your-api-key' });
+const swapClient = bloque.swap;
+```
+
+## Properties
+
+### pse
+
+<ResponseField name="pse" type="PseClient" required>
+  PSE (Pagos Seguros en Línea) utilities client for listing banks and creating PSE swap orders.
+  
+  See [PseClient](/api/swap/pse-client) for details.
+</ResponseField>
+
+### bankTransfer
+
+<ResponseField name="bankTransfer" type="BankTransferClient" required>
+  Generic bank transfer client for cash-out swaps supporting all Colombian banks.
+  
+  See [BankTransferClient](/api/swap/bank-transfer-client) for details.
+</ResponseField>
+
+## Methods
+
+### findRates()
+
+Retrieves available exchange rates for a given asset pair with optional filters.
+
+```typescript
+async findRates(params: FindRatesParams): Promise<FindRatesResult>
+```
+
+#### Parameters
+
+<ParamField path="params" type="FindRatesParams" required>
+  Rate search parameters
+
+  <Expandable title="FindRatesParams properties">
+    <ParamField path="fromAsset" type="string" required>
+      Source asset with precision (e.g., `"COP/2"` where `/2` indicates 2 decimal places)
+      
+      **Example:** `"COP/2"`
+    </ParamField>
+
+    <ParamField path="toAsset" type="string" required>
+      Destination asset with precision (e.g., `"DUSD/6"` where `/6` indicates 6 decimal places)
+      
+      **Example:** `"DUSD/6"`
+    </ParamField>
+
+    <ParamField path="fromMediums" type="string[]" required>
+      Source payment mediums (e.g., PSE, Bancolombia, Nequi)
+      
+      **Example:** `["bancolombia", "pse"]`
+    </ParamField>
+
+    <ParamField path="toMediums" type="string[]" required>
+      Destination payment mediums (e.g., Pomelo, Kusama)
+      
+      **Example:** `["kusama", "pomelo"]`
+    </ParamField>
+
+    <ParamField path="amountSrc" type="string">
+      Source amount as bigint string (scaled by asset precision).
+      Provide this OR `amountDst`, not both.
+      
+      **Example:** `"1000000"` represents 10000.00 for COP/2
+    </ParamField>
+
+    <ParamField path="amountDst" type="string">
+      Destination amount as bigint string (scaled by asset precision).
+      Provide this OR `amountSrc`, not both.
+      
+      **Example:** `"50000"` represents 0.5000 for USD/4
+    </ParamField>
+
+    <ParamField path="sort" type="'asc' | 'desc'" default="asc">
+      Sort order: `'asc'` (best rate first) or `'desc'` (highest rate first)
+    </ParamField>
+
+    <ParamField path="sortBy" type="'rate' | 'at'" default="rate">
+      Sort by field: `'rate'` (by exchange ratio) or `'at'` (by calculation time)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+#### Returns
+
+<ResponseField name="FindRatesResult" type="object">
+  <Expandable title="FindRatesResult properties">
+    <ResponseField name="rates" type="SwapRate[]">
+      Array of available exchange rates
+
+      <Expandable title="SwapRate properties">
+        <ResponseField name="id" type="string">
+          Unique rate identifier
+        </ResponseField>
+
+        <ResponseField name="sig" type="string">
+          Rate signature (use this when creating orders)
+        </ResponseField>
+
+        <ResponseField name="swapSig" type="string">
+          Swap signature
+        </ResponseField>
+
+        <ResponseField name="maker" type="string">
+          Maker identifier
+        </ResponseField>
+
+        <ResponseField name="edge" type="[string, string]">
+          Asset edge tuple: `[fromAsset, toAsset]`
+        </ResponseField>
+
+        <ResponseField name="fee" type="Fee">
+          Fee details for this rate
+
+          <Expandable title="Fee properties">
+            <ResponseField name="at" type="number">
+              Timestamp when the fee was calculated
+            </ResponseField>
+
+            <ResponseField name="value" type="number">
+              Total fee value
+            </ResponseField>
+
+            <ResponseField name="formula" type="string">
+              Formula used to calculate the fee
+            </ResponseField>
+
+            <ResponseField name="components" type="FeeComponent[]">
+              Individual fee components
+
+              <Expandable title="FeeComponent properties">
+                <ResponseField name="at" type="number">
+                  Timestamp when this component was calculated
+                </ResponseField>
+
+                <ResponseField name="name" type="string">
+                  Component name (e.g., `'take_rate'`, `'exchange_rate'`, `'pse_fee'`)
+                </ResponseField>
+
+                <ResponseField name="type" type="'percentage' | 'rate' | 'fixed'">
+                  Type of fee component
+                </ResponseField>
+
+                <ResponseField name="value" type="number | string">
+                  Component value
+                </ResponseField>
+
+                <ResponseField name="percentage" type="number">
+                  Percentage value (only for percentage type)
+                </ResponseField>
+
+                <ResponseField name="pair" type="string">
+                  Currency pair (only for rate type)
+                </ResponseField>
+
+                <ResponseField name="amount" type="number">
+                  Fixed amount (only for fixed type)
+                </ResponseField>
+              </Expandable>
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+
+        <ResponseField name="at" type="string">
+          Timestamp when the rate was created
+        </ResponseField>
+
+        <ResponseField name="until" type="string">
+          Timestamp until the rate is valid
+        </ResponseField>
+
+        <ResponseField name="fromMediums" type="string[]">
+          Available source mediums
+        </ResponseField>
+
+        <ResponseField name="toMediums" type="string[]">
+          Available destination mediums
+        </ResponseField>
+
+        <ResponseField name="rate" type="[number, number]">
+          Rate tuple: `[sourceAmount, destinationAmount]`
+        </ResponseField>
+
+        <ResponseField name="ratio" type="number">
+          Exchange ratio (destination amount per source amount)
+        </ResponseField>
+
+        <ResponseField name="fromLimits" type="[string, string]">
+          Source amount limits: `[min, max]`
+        </ResponseField>
+
+        <ResponseField name="toLimits" type="[string, string]">
+          Destination amount limits: `[min, max]`
+        </ResponseField>
+
+        <ResponseField name="createdAt" type="string">
+          Creation timestamp
+        </ResponseField>
+
+        <ResponseField name="updatedAt" type="string">
+          Last update timestamp
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Example
+
+```typescript
+const result = await bloque.swap.findRates({
+  fromAsset: 'COP/2',
+  toAsset: 'DUSD/6',
+  fromMediums: ['bancolombia'],
+  toMediums: ['kusama'],
+  amountSrc: '50000000' // 500000.00 COP (scaled by 2 decimals)
+});
+
+console.log('Exchange ratio:', result.rates[0].ratio);
+console.log('Fee breakdown:', result.rates[0].fee.components);
+```
+
+## Fee Structure
+
+Exchange rates include detailed fee information with multiple components:
+
+### Fee Component Types
+
+<ResponseField name="percentage" type="FeeComponentType">
+  Percentage-based fee (e.g., 2.5% of transaction)
+  - `percentage`: The percentage value (e.g., 2.5)
+  - Used for: Platform fees, take rates
+</ResponseField>
+
+<ResponseField name="rate" type="FeeComponentType">
+  Exchange rate-based fee
+  - `pair`: Currency pair (e.g., "USD/COP")
+  - Used for: Exchange rate spreads
+</ResponseField>
+
+<ResponseField name="fixed" type="FeeComponentType">
+  Fixed amount fee
+  - `amount`: Fixed fee amount
+  - Used for: PSE transaction fees, bank transfer fees
+</ResponseField>
+
+### Fee Calculation Example
+
+```typescript
+const rate = result.rates[0];
+
+console.log('Total fee:', rate.fee.value);
+console.log('Fee formula:', rate.fee.formula);
+
+// Inspect individual components
+for (const component of rate.fee.components) {
+  console.log(`${component.name} (${component.type}):`, component.value);
+  
+  if (component.type === 'percentage') {
+    console.log('  Percentage:', component.percentage);
+  } else if (component.type === 'rate') {
+    console.log('  Pair:', component.pair);
+  } else if (component.type === 'fixed') {
+    console.log('  Amount:', component.amount);
+  }
+}
+```
+
+## Rate Calculation
+
+Rates are calculated based on:
+
+1. **Base exchange rate**: The market rate between the two assets
+2. **Medium fees**: Fees charged by payment providers (e.g., PSE, bank transfers)
+3. **Platform fees**: Bloque's service fee
+4. **Amount**: The source or destination amount you specify
+
+### Understanding the Rate Tuple
+
+The `rate` field is a tuple `[sourceAmount, destinationAmount]` representing the conversion:
+
+```typescript
+const [srcAmount, dstAmount] = rate.rate;
+const ratio = rate.ratio; // dstAmount / srcAmount
+
+// Example: [100000, 95000] means 1000.00 COP = 950.00 COP after fees
+// Ratio: 0.95 (95% conversion after 5% fees)
+```
+
+### Amount Limits
+
+Each rate includes minimum and maximum amounts:
+
+```typescript
+const [minSrc, maxSrc] = rate.fromLimits;
+const [minDst, maxDst] = rate.toLimits;
+
+console.log(`Source range: ${minSrc} - ${maxSrc}`);
+console.log(`Destination range: ${minDst} - ${maxDst}`);
+```
+
+## Related Types
+
+- `FindRatesParams` - Parameters for rate search
+- `FindRatesResult` - Result containing available rates
+- `SwapRate` - Individual exchange rate details
+- `Fee` - Fee structure and breakdown
+- `FeeComponent` - Individual fee component

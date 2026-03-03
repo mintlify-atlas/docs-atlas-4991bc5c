@@ -1,0 +1,517 @@
+---
+title: Error Handling
+description: Error types, handling patterns, and best practices for the Bloque SDK
+---
+
+The Bloque SDK provides a comprehensive error handling system with specific error types for different failure scenarios. All errors extend the base `BloqueAPIError` class.
+
+## Error Hierarchy
+
+All SDK errors inherit from `BloqueAPIError`, which provides common properties for debugging and logging:
+
+```typescript
+interface BloqueAPIError extends Error {
+  message: string;         // Human-readable error message
+  status?: number;         // HTTP status code (e.g., 400, 401, 500)
+  code?: string;           // Error code from API (e.g., 'INVALID_ALIAS')
+  requestId?: string;      // Request ID for tracing
+  timestamp: Date;         // When the error occurred
+  response?: unknown;      // Original response body for debugging
+  cause?: Error;          // Underlying error (e.g., network error)
+  toJSON(): object;       // JSON representation for logging
+}
+```
+
+## Error Types
+
+### BloqueAPIError
+
+Base error class for all Bloque API errors. Thrown when the API returns an error response or when a network/timeout error occurs.
+
+```typescript
+import { BloqueAPIError } from '@bloque/sdk-core';
+
+try {
+  await sdk.accounts.virtual.create({ currency: 'USD' });
+} catch (error) {
+  if (error instanceof BloqueAPIError) {
+    console.error('API Error:', {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+      requestId: error.requestId,
+      timestamp: error.timestamp
+    });
+  }
+}
+```
+
+### BloqueValidationError
+
+Thrown when request validation fails (HTTP 400).
+
+**Common causes:**
+- Missing required fields
+- Invalid field format
+- Invalid field values
+- Business rule validation failures
+
+```typescript
+import { BloqueValidationError } from '@bloque/sdk-core';
+
+try {
+  await sdk.accounts.virtual.create({
+    currency: 'INVALID' // Invalid currency code
+  });
+} catch (error) {
+  if (error instanceof BloqueValidationError) {
+    console.error('Validation failed:', error.message);
+    
+    // Access field-specific validation errors if available
+    if (error.validationErrors) {
+      Object.entries(error.validationErrors).forEach(([field, errors]) => {
+        console.error(`${field}:`, errors.join(', '));
+      });
+    }
+  }
+}
+```
+
+<ParamField path="validationErrors" type="Record<string, string[]>">
+  Validation errors grouped by field (if provided by API)
+</ParamField>
+
+### BloqueAuthenticationError
+
+Thrown when authentication fails (HTTP 401 or 403).
+
+**Common causes:**
+- Invalid or expired API key
+- Invalid or expired JWT token
+- Insufficient permissions for the requested operation
+
+```typescript
+import { BloqueAuthenticationError } from '@bloque/sdk-core';
+
+try {
+  const session = await sdk.connect('user@example.com');
+} catch (error) {
+  if (error instanceof BloqueAuthenticationError) {
+    console.error('Authentication failed:', error.message);
+    
+    // Redirect to login or refresh token
+    if (error.status === 401) {
+      // Token expired - refresh or re-authenticate
+      redirectToLogin();
+    } else if (error.status === 403) {
+      // Insufficient permissions
+      showPermissionError();
+    }
+  }
+}
+```
+
+### BloqueNotFoundError
+
+Thrown when a resource is not found (HTTP 404).
+
+**Common causes:**
+- Invalid resource ID
+- Resource was deleted
+- User doesn't have access to the resource
+
+```typescript
+import { BloqueNotFoundError } from '@bloque/sdk-core';
+
+try {
+  await session.accounts.virtual.get('acc_nonexistent');
+} catch (error) {
+  if (error instanceof BloqueNotFoundError) {
+    console.error('Resource not found:', {
+      type: error.resourceType,     // e.g., 'account'
+      id: error.resourceId,          // e.g., 'acc_nonexistent'
+      message: error.message
+    });
+  }
+}
+```
+
+<ParamField path="resourceType" type="string">
+  Type of resource that was not found (e.g., 'identity', 'account')
+</ParamField>
+
+<ParamField path="resourceId" type="string">
+  ID of the resource that was not found
+</ParamField>
+
+### BloqueRateLimitError
+
+Thrown when the API rate limit is exceeded (HTTP 429).
+
+<Info>
+The SDK automatically retries rate-limited requests if retry is enabled. This error is only thrown after all retry attempts are exhausted.
+</Info>
+
+```typescript
+import { BloqueRateLimitError } from '@bloque/sdk-core';
+
+try {
+  await sdk.accounts.virtual.create({ currency: 'USD' });
+} catch (error) {
+  if (error instanceof BloqueRateLimitError) {
+    console.error('Rate limit exceeded');
+    
+    // Check when to retry
+    if (error.retryAfter) {
+      console.log(`Retry after ${error.retryAfter} seconds`);
+      setTimeout(() => {
+        // Retry the operation
+      }, error.retryAfter * 1000);
+    }
+  }
+}
+```
+
+<ParamField path="retryAfter" type="number">
+  Number of seconds to wait before retrying (from `Retry-After` header)
+</ParamField>
+
+### BloqueInsufficientFundsError
+
+Thrown when an operation requires more funds than available.
+
+```typescript
+import { BloqueInsufficientFundsError } from '@bloque/sdk-core';
+
+try {
+  await session.accounts.virtual.transfer({
+    from: 'acc_123',
+    to: 'acc_456',
+    amount: 1000000,
+    currency: 'USD'
+  });
+} catch (error) {
+  if (error instanceof BloqueInsufficientFundsError) {
+    console.error('Insufficient funds:', {
+      requested: error.requestedAmount,
+      available: error.availableBalance,
+      currency: error.currency
+    });
+    
+    // Show user-friendly message
+    alert(`Insufficient balance. You need ${error.requestedAmount} ${error.currency} but only have ${error.availableBalance} ${error.currency}`);
+  }
+}
+```
+
+<ParamField path="requestedAmount" type="number">
+  Amount requested for the operation
+</ParamField>
+
+<ParamField path="availableBalance" type="number">
+  Available balance in the account
+</ParamField>
+
+<ParamField path="currency" type="string">
+  Currency code (e.g., 'USD', 'CLP')
+</ParamField>
+
+### BloqueNetworkError
+
+Thrown when a network error occurs.
+
+**Common causes:**
+- No internet connection
+- DNS resolution failure
+- Connection refused
+- SSL/TLS errors
+
+```typescript
+import { BloqueNetworkError } from '@bloque/sdk-core';
+
+try {
+  await sdk.connect('user@example.com');
+} catch (error) {
+  if (error instanceof BloqueNetworkError) {
+    console.error('Network error:', error.message);
+    
+    // Show user-friendly message
+    alert('Unable to connect. Please check your internet connection.');
+    
+    // Log underlying cause
+    if (error.cause) {
+      console.error('Caused by:', error.cause);
+    }
+  }
+}
+```
+
+### BloqueTimeoutError
+
+Thrown when a request exceeds the configured timeout duration.
+
+<Info>
+The SDK automatically retries timeout errors if retry is enabled.
+</Info>
+
+```typescript
+import { BloqueTimeoutError } from '@bloque/sdk-core';
+
+try {
+  await sdk.accounts.virtual.create({ currency: 'USD' });
+} catch (error) {
+  if (error instanceof BloqueTimeoutError) {
+    console.error(`Request timed out after ${error.timeoutMs}ms`);
+    
+    // Retry with longer timeout
+    // Note: This example is simplified - use proper retry logic
+  }
+}
+```
+
+<ParamField path="timeoutMs" type="number">
+  Timeout duration in milliseconds that was exceeded
+</ParamField>
+
+### BloqueConfigError
+
+Thrown when the SDK is misconfigured. This error is thrown before making any API requests.
+
+```typescript
+import { BloqueConfigError } from '@bloque/sdk-core';
+
+try {
+  const sdk = new SDK({
+    mode: 'production',
+    baseUrl: 'https://custom.com', // ❌ Cannot use both
+    auth: { type: 'apiKey', apiKey: 'key_...' }
+  });
+} catch (error) {
+  if (error instanceof BloqueConfigError) {
+    console.error('Configuration error:', error.message);
+  }
+}
+```
+
+## Error Handling Patterns
+
+### Type-Safe Error Handling
+
+Use TypeScript's type narrowing with `instanceof` to handle specific error types:
+
+```typescript
+import {
+  BloqueValidationError,
+  BloqueAuthenticationError,
+  BloqueNotFoundError,
+  BloqueRateLimitError,
+  BloqueInsufficientFundsError,
+  BloqueNetworkError,
+  BloqueTimeoutError,
+  BloqueAPIError
+} from '@bloque/sdk-core';
+
+try {
+  const result = await sdk.accounts.virtual.create({ currency: 'USD' });
+} catch (error) {
+  if (error instanceof BloqueValidationError) {
+    // Handle validation errors
+    handleValidationError(error);
+  } else if (error instanceof BloqueAuthenticationError) {
+    // Handle auth errors
+    redirectToLogin();
+  } else if (error instanceof BloqueNotFoundError) {
+    // Handle not found
+    show404Page();
+  } else if (error instanceof BloqueRateLimitError) {
+    // Handle rate limiting
+    showRateLimitMessage(error.retryAfter);
+  } else if (error instanceof BloqueInsufficientFundsError) {
+    // Handle insufficient funds
+    showInsufficientFundsMessage(error);
+  } else if (error instanceof BloqueNetworkError) {
+    // Handle network errors
+    showNetworkError();
+  } else if (error instanceof BloqueTimeoutError) {
+    // Handle timeouts
+    showTimeoutError();
+  } else if (error instanceof BloqueAPIError) {
+    // Handle other API errors
+    showGenericError(error);
+  } else {
+    // Handle unexpected errors
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+### Global Error Handler
+
+Create a centralized error handler for consistent error handling:
+
+```typescript
+import { BloqueAPIError } from '@bloque/sdk-core';
+
+function handleBloqueError(error: unknown) {
+  if (!(error instanceof BloqueAPIError)) {
+    console.error('Unexpected error:', error);
+    return;
+  }
+  
+  // Log for debugging
+  console.error('Bloque API Error:', error.toJSON());
+  
+  // Track in error monitoring service
+  errorMonitoring.captureException(error, {
+    extra: {
+      requestId: error.requestId,
+      code: error.code,
+      status: error.status
+    }
+  });
+  
+  // Show user-friendly message based on error type
+  const message = getUserFriendlyMessage(error);
+  showToast(message, 'error');
+}
+
+function getUserFriendlyMessage(error: BloqueAPIError): string {
+  if (error instanceof BloqueNetworkError) {
+    return 'Unable to connect. Please check your internet connection.';
+  }
+  if (error instanceof BloqueAuthenticationError) {
+    return 'Your session has expired. Please log in again.';
+  }
+  if (error instanceof BloqueValidationError) {
+    return error.message; // Validation messages are usually user-friendly
+  }
+  return 'Something went wrong. Please try again later.';
+}
+```
+
+### Retry Logic
+
+Implement custom retry logic for specific operations:
+
+```typescript
+import { BloqueTimeoutError, BloqueNetworkError } from '@bloque/sdk-core';
+
+async function retryOperation<T>(
+  operation: () => Promise<T>,
+  maxRetries = 3,
+  delayMs = 1000
+): Promise<T> {
+  let lastError: Error;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Only retry on network or timeout errors
+      if (
+        error instanceof BloqueNetworkError ||
+        error instanceof BloqueTimeoutError
+      ) {
+        // Exponential backoff
+        const delay = delayMs * Math.pow(2, attempt);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      // Don't retry other errors
+      throw error;
+    }
+  }
+  
+  throw lastError!;
+}
+
+// Usage
+const account = await retryOperation(
+  () => sdk.accounts.virtual.create({ currency: 'USD' }),
+  3,
+  1000
+);
+```
+
+## Logging and Debugging
+
+All errors include a `toJSON()` method for structured logging:
+
+```typescript
+import { BloqueAPIError } from '@bloque/sdk-core';
+
+try {
+  await sdk.accounts.virtual.create({ currency: 'USD' });
+} catch (error) {
+  if (error instanceof BloqueAPIError) {
+    // Log structured error data
+    console.error('API Error:', error.toJSON());
+    // Output:
+    // {
+    //   name: 'BloqueValidationError',
+    //   message: 'Invalid currency code',
+    //   status: 400,
+    //   code: 'INVALID_CURRENCY',
+    //   requestId: 'req_abc123',
+    //   timestamp: '2024-03-15T10:30:00.000Z',
+    //   response: { ... },
+    //   stack: '...'
+    // }
+  }
+}
+```
+
+### Request Tracing
+
+Use the `requestId` field to trace requests across your system:
+
+```typescript
+try {
+  await sdk.accounts.virtual.create({ currency: 'USD' });
+} catch (error) {
+  if (error instanceof BloqueAPIError && error.requestId) {
+    // Include request ID in logs for support inquiries
+    logger.error(`Failed to create account [requestId: ${error.requestId}]`, {
+      error: error.toJSON()
+    });
+  }
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Always Handle Errors" icon="shield-check">
+    Never leave `await` calls without try-catch blocks in production code
+  </Card>
+  
+  <Card title="Use Type Guards" icon="filter">
+    Use `instanceof` checks for type-safe error handling
+  </Card>
+  
+  <Card title="Log Request IDs" icon="fingerprint">
+    Include `requestId` in error logs for easier debugging
+  </Card>
+  
+  <Card title="User-Friendly Messages" icon="message">
+    Convert technical errors to user-friendly messages
+  </Card>
+</CardGroup>
+
+<Warning>
+Never expose sensitive error details (like API keys or internal implementation details) to end users.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/concepts/configuration">
+    Configure timeout and retry settings
+  </Card>
+  <Card title="Platform Support" icon="server" href="/concepts/platform-support">
+    Platform-specific error handling
+  </Card>
+</CardGroup>

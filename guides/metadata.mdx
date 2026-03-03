@@ -1,0 +1,444 @@
+---
+title: Metadata
+description: Attach custom data to accounts, transfers, and operations
+---
+
+## Overview
+
+Metadata allows you to attach custom key-value pairs to Bloque resources. Use metadata to:
+
+- Store application-specific data
+- Track internal references and IDs
+- Add context to transactions
+- Implement custom business logic
+- Enable filtering and reporting
+
+<Note>
+Metadata is **not** used for operational logic by Bloque—it's purely for your application's use. However, certain metadata fields like `spending_control` and `mcc_whitelist` are used to configure card behavior.
+</Note>
+
+## Metadata on Accounts
+
+Attach metadata when creating accounts to store custom information.
+
+### Card Accounts
+
+```typescript
+const card = await user.accounts.card.create({
+  name: 'Corporate Card',
+  ledgerId: pocket.ledgerId,
+  metadata: {
+    // Custom application data
+    department: 'engineering',
+    employeeId: 'EMP-12345',
+    costCenter: 'CC-001',
+    
+    // Card configuration (special fields)
+    spending_control: 'smart',
+    preferred_asset: 'DUSD/6',
+    default_asset: 'DUSD/6',
+    mcc_whitelist: {
+      [foodPocket.urn]: ['5411', '5812'],
+    },
+    priority_mcc: [foodPocket.urn, generalPocket.urn],
+  },
+});
+
+console.log('Department:', card.metadata?.department);
+```
+
+<Warning>
+For card accounts, certain metadata fields are **reserved** and control card behavior:
+- `spending_control` - 'default' or 'smart'
+- `mcc_whitelist` - MCC routing configuration
+- `priority_mcc` - Pocket priority order
+- `preferred_asset` - Preferred settlement asset
+- `default_asset` - Default asset for transactions
+
+See [Spending Controls](/guides/spending-controls) for details.
+</Warning>
+
+### Virtual Accounts
+
+```typescript
+const pocket = await user.accounts.virtual.create(
+  {
+    name: 'Project Budget',
+    metadata: {
+      projectId: 'PROJ-789',
+      budgetYear: 2025,
+      owner: 'alice@example.com',
+      tags: ['research', 'development'],
+    },
+  },
+  { waitLedger: true },
+);
+```
+
+### Polygon Wallets
+
+```typescript
+const wallet = await user.accounts.polygon.create({
+  address: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+  metadata: {
+    network: 'mainnet',
+    purpose: 'treasury',
+    multiSig: false,
+  },
+});
+```
+
+## Metadata on Transfers
+
+Add context to individual transfers:
+
+### Single Transfer
+
+```typescript
+const transfer = await user.accounts.transfer({
+  sourceUrn: savings.urn,
+  destinationUrn: spending.urn,
+  amount: '50000000',
+  asset: 'DUSD/6',
+  metadata: {
+    // Transaction context
+    note: 'Weekly allowance',
+    category: 'personal',
+    invoiceId: 'INV-2025-001',
+    externalRef: 'ext_abc123',
+    
+    // Custom tracking
+    reconciliationId: 'REC-456',
+    approvedBy: 'manager@example.com',
+  },
+});
+```
+
+### Batch Transfer
+
+Metadata can be added at both the batch level and per-operation:
+
+```typescript
+const result = await user.accounts.batchTransfer({
+  reference: 'payroll-2025-02',
+  
+  // Batch-level metadata
+  metadata: {
+    department: 'engineering',
+    period: '2025-02',
+    payrollRun: 'PR-2025-02-15',
+    approvedBy: 'hr@example.com',
+    totalEmployees: 3,
+  },
+  
+  operations: [
+    {
+      fromUrn: treasury.urn,
+      toUrn: alice.urn,
+      reference: 'salary-alice-feb',
+      amount: '3000000000',
+      asset: 'DUSD/6',
+      
+      // Per-operation metadata
+      metadata: {
+        employee: 'alice',
+        employeeId: 'EMP-001',
+        type: 'salary',
+        hours: 160,
+        rate: '18.75',
+      },
+    },
+    {
+      fromUrn: treasury.urn,
+      toUrn: bob.urn,
+      reference: 'salary-bob-feb',
+      amount: '2500000000',
+      asset: 'DUSD/6',
+      metadata: {
+        employee: 'bob',
+        employeeId: 'EMP-002',
+        type: 'salary',
+        hours: 160,
+        rate: '15.625',
+      },
+    },
+  ],
+  
+  webhookUrl: 'https://api.example.com/webhooks/payroll',
+});
+```
+
+## Updating Metadata
+
+Update metadata on existing accounts:
+
+### Card Metadata
+
+```typescript
+const updated = await user.accounts.card.updateMetadata({
+  urn: card.urn,
+  metadata: {
+    // Update custom fields
+    department: 'sales',
+    cardLimit: '10000',
+    
+    // Update spending controls
+    spending_control: 'smart',
+    mcc_whitelist: {
+      [foodPocket.urn]: ['5411', '5812', '5814'],
+    },
+    priority_mcc: [foodPocket.urn, mainWallet.urn],
+  },
+});
+```
+
+<Warning>
+For card accounts, `name` and `source` are **reserved fields** and cannot be modified via `updateMetadata()`.
+</Warning>
+
+### Virtual Account Metadata
+
+```typescript
+const updated = await user.accounts.virtual.updateMetadata({
+  urn: pocket.urn,
+  metadata: {
+    budgetYear: 2026,
+    lastReviewed: new Date().toISOString(),
+    status: 'active',
+  },
+});
+```
+
+## Metadata Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use consistent naming" icon="tags">
+    Establish naming conventions for metadata keys across your application.
+  </Card>
+  <Card title="Keep it flat" icon="layer-group">
+    Avoid deeply nested objects. Use simple key-value pairs when possible.
+  </Card>
+  <Card title="Don't store sensitive data" icon="shield-halved">
+    Never store passwords, API keys, or PII in metadata fields.
+  </Card>
+  <Card title="Document your schema" icon="book">
+    Maintain documentation of metadata fields used in your application.
+  </Card>
+</CardGroup>
+
+## Metadata Limits
+
+<Note>
+- **Keys**: Max 256 characters, alphanumeric and underscores only
+- **Values**: Max 2048 characters per value
+- **Total size**: Max 50 metadata keys per resource
+- **Types**: Strings, numbers, booleans, null, and simple arrays/objects
+</Note>
+
+## Common Patterns
+
+### Tracking External References
+
+Link Bloque resources to your internal systems:
+
+```typescript
+const account = await user.accounts.virtual.create({
+  metadata: {
+    internalId: 'ACC-12345',
+    externalSystem: 'salesforce',
+    externalId: 'sf_0062000001abc',
+    syncedAt: new Date().toISOString(),
+  },
+});
+```
+
+### Multi-tenancy
+
+Segment resources by tenant or organization:
+
+```typescript
+const card = await user.accounts.card.create({
+  metadata: {
+    tenantId: 'tenant_xyz',
+    organizationId: 'org_abc',
+    workspaceId: 'ws_123',
+  },
+});
+```
+
+### Feature Flags
+
+Control feature availability per account:
+
+```typescript
+const account = await user.accounts.virtual.create({
+  metadata: {
+    features: {
+      advancedReporting: true,
+      autoTopUp: false,
+      exportToCsv: true,
+    },
+  },
+});
+```
+
+### Audit Trail
+
+Track who created or modified resources:
+
+```typescript
+const transfer = await user.accounts.transfer({
+  sourceUrn: source.urn,
+  destinationUrn: dest.urn,
+  amount: '1000000',
+  asset: 'DUSD/6',
+  metadata: {
+    createdBy: 'user@example.com',
+    createdAt: new Date().toISOString(),
+    ipAddress: request.ip,
+    userAgent: request.headers['user-agent'],
+    reason: 'Monthly subscription payment',
+  },
+});
+```
+
+## Retrieving Metadata
+
+Metadata is included when fetching accounts or transactions:
+
+```typescript
+// Get single account
+const account = await user.accounts.get(accountUrn);
+console.log('Metadata:', account.metadata);
+
+// List accounts
+const { accounts } = await user.accounts.list();
+accounts.forEach((acc) => {
+  console.log(`${acc.urn}: ${JSON.stringify(acc.metadata)}`);
+});
+
+// Check movements
+const { data } = await user.accounts.movements({
+  urn: account.urn,
+  asset: 'DUSD/6',
+});
+
+data.forEach((movement) => {
+  if (movement.details?.metadata) {
+    console.log('Transaction metadata:', movement.details.metadata);
+  }
+});
+```
+
+## Metadata in Webhooks
+
+Metadata is included in webhook payloads:
+
+```json
+{
+  "event": "transfer.completed",
+  "timestamp": "2025-02-15T14:30:00Z",
+  "data": {
+    "queueId": "queue_abc123",
+    "sourceUrn": "did:bloque:account:virtual:acc-12345",
+    "destinationUrn": "did:bloque:account:card:usr-123:crd-456",
+    "amount": "50000000",
+    "asset": "DUSD/6",
+    "status": "completed",
+    "metadata": {
+      "note": "Weekly allowance",
+      "category": "personal",
+      "invoiceId": "INV-2025-001"
+    }
+  }
+}
+```
+
+Use metadata to route webhooks or trigger specific actions:
+
+```typescript
+app.post('/webhooks/bloque', async (req, res) => {
+  const { event, data } = req.body;
+  
+  if (event === 'transfer.completed') {
+    const { metadata } = data;
+    
+    // Route based on metadata
+    if (metadata?.category === 'payroll') {
+      await notifyHRDepartment(data);
+    } else if (metadata?.category === 'invoice') {
+      await updateInvoiceStatus(metadata.invoiceId, 'paid');
+    }
+  }
+  
+  res.status(200).send('OK');
+});
+```
+
+## Examples by Use Case
+
+<AccordionGroup>
+  <Accordion title="E-commerce Platform">
+    ```typescript
+    // Track order and customer information
+    const transfer = await user.accounts.transfer({
+      sourceUrn: customer.urn,
+      destinationUrn: merchant.urn,
+      amount: '99000000', // $99
+      asset: 'DUSD/6',
+      metadata: {
+        orderId: 'ORD-2025-12345',
+        customerId: 'CUST-67890',
+        items: JSON.stringify([
+          { sku: 'PROD-001', qty: 2 },
+          { sku: 'PROD-002', qty: 1 },
+        ]),
+        shippingAddress: 'addr_abc123',
+        paymentMethod: 'card',
+      },
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Subscription Service">
+    ```typescript
+    // Track subscription details
+    const transfer = await user.accounts.transfer({
+      sourceUrn: user.urn,
+      destinationUrn: service.urn,
+      amount: '29000000', // $29/month
+      asset: 'DUSD/6',
+      metadata: {
+        subscriptionId: 'SUB-789',
+        plan: 'premium',
+        billingPeriod: '2025-02',
+        renewalDate: '2025-03-15',
+        autoRenew: true,
+      },
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Expense Management">
+    ```typescript
+    // Track employee expenses
+    const card = await user.accounts.card.create({
+      metadata: {
+        employeeId: 'EMP-123',
+        department: 'sales',
+        expenseCategory: 'travel',
+        approvalRequired: true,
+        monthlyLimit: '5000000000', // $5,000
+        requiresReceipt: true,
+      },
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related
+
+- [Transfers](/guides/transfers) - Using metadata in transfers
+- [Spending Controls](/guides/spending-controls) - Card metadata fields
+- [Webhooks](/guides/webhooks) - Metadata in webhook payloads
+- [Card Accounts](/accounts/card) - Card-specific metadata

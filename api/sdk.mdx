@@ -1,0 +1,483 @@
+---
+title: 'SDK'
+description: 'Main SDK class for interacting with the Bloque API'
+---
+
+## Constructor
+
+Creates a new instance of the Bloque SDK.
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const sdk = new SDK(config);
+```
+
+<ParamField path="config" type="BloqueSDKConfig" required>
+  Configuration object for the SDK. See [Configuration](/api/configuration) for details.
+</ParamField>
+
+### Example
+
+<Tabs>
+  <Tab title="API Key (Backend)">
+    ```typescript
+    import { SDK } from '@bloque/sdk';
+
+    const sdk = new SDK({
+      auth: {
+        type: 'apiKey',
+        apiKey: 'your-api-key'
+      },
+      origin: 'your-origin',
+      platform: 'node'
+    });
+    ```
+  </Tab>
+  <Tab title="JWT (Frontend)">
+    ```typescript
+    import { SDK } from '@bloque/sdk';
+
+    const sdk = new SDK({
+      auth: {
+        type: 'jwt'
+      },
+      platform: 'browser',
+      tokenStorage: {
+        get: () => localStorage.getItem('bloque_token'),
+        set: (token) => localStorage.setItem('bloque_token', token),
+        clear: () => localStorage.removeItem('bloque_token')
+      }
+    });
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## authenticate()
+
+Authenticates the current session using JWT authentication. Retrieves the user identity and initializes all SDK clients.
+
+```typescript
+async authenticate(): Promise<SDKClients>
+```
+
+<Note>
+  This method is only available when using JWT authentication (`auth.type === 'jwt'`).
+</Note>
+
+<ResponseField name="accounts" type="AccountsClient">
+  Client for managing accounts (cards, virtual accounts, Polygon, Bancolombia)
+</ResponseField>
+
+<ResponseField name="compliance" type="ComplianceClient">
+  Client for KYC/KYB verification and compliance operations
+</ResponseField>
+
+<ResponseField name="identity" type="IdentityClient">
+  Client for identity and alias management
+</ResponseField>
+
+<ResponseField name="orgs" type="OrgsClient">
+  Client for organization management
+</ResponseField>
+
+<ResponseField name="swap" type="SwapClient">
+  Client for swap operations
+</ResponseField>
+
+<ResponseField name="urn" type="string">
+  The URN (Uniform Resource Name) of the authenticated identity
+</ResponseField>
+
+<ResponseField name="accessToken" type="string">
+  The access token for the authenticated session
+</ResponseField>
+
+### Example
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const sdk = new SDK({
+  auth: { type: 'jwt' },
+  platform: 'browser'
+});
+
+const clients = await sdk.authenticate();
+
+// Access various clients
+const cards = await clients.accounts.card.list();
+const profile = await clients.identity.me();
+```
+
+---
+
+## me()
+
+Retrieves the identity information for the current session.
+
+```typescript
+async me(): Promise<IdentityMe>
+```
+
+<ResponseField name="urn" type="string">
+  The URN of the identity
+</ResponseField>
+
+<ResponseField name="origin" type="string">
+  The origin identifier
+</ResponseField>
+
+<ResponseField name="aliases" type="string[]">
+  List of aliases associated with the identity
+</ResponseField>
+
+### Example
+
+```typescript
+const identity = await sdk.me();
+
+console.log(identity.urn); // did:bloque:my-origin:user@example.com
+console.log(identity.origin); // my-origin
+console.log(identity.aliases); // ['user@example.com', '+1234567890']
+```
+
+---
+
+## register()
+
+Registers a new identity with the specified alias.
+
+```typescript
+async register(
+  alias: string,
+  params: CreateIdentityParams
+): Promise<SDKClients>
+```
+
+<ParamField path="alias" type="string" required>
+  The alias to register (email or phone number)
+</ParamField>
+
+<ParamField path="params" type="CreateIdentityParams" required>
+  Identity creation parameters
+</ParamField>
+
+<ParamField path="params.extraContext" type="Record<string, any>">
+  Additional context metadata for the identity
+</ParamField>
+
+<ResponseField name="accounts" type="AccountsClient">
+  Client for managing accounts
+</ResponseField>
+
+<ResponseField name="compliance" type="ComplianceClient">
+  Client for compliance operations
+</ResponseField>
+
+<ResponseField name="identity" type="IdentityClient">
+  Client for identity management
+</ResponseField>
+
+<ResponseField name="orgs" type="OrgsClient">
+  Client for organization management
+</ResponseField>
+
+<ResponseField name="swap" type="SwapClient">
+  Client for swap operations
+</ResponseField>
+
+<ResponseField name="urn" type="string">
+  The URN of the newly registered identity
+</ResponseField>
+
+<ResponseField name="accessToken" type="string">
+  The access token for the new session
+</ResponseField>
+
+### Example
+
+```typescript
+const sdk = new SDK({
+  auth: {
+    type: 'apiKey',
+    apiKey: 'your-api-key'
+  },
+  origin: 'my-origin',
+  platform: 'node'
+});
+
+const clients = await sdk.register('user@example.com', {
+  extraContext: {
+    firstName: 'John',
+    lastName: 'Doe',
+    country: 'US'
+  }
+});
+
+console.log(clients.urn); // did:bloque:my-origin:user@example.com
+```
+
+---
+
+## connect()
+
+Connects to an existing identity. The method signature varies based on authentication type.
+
+<Tabs>
+  <Tab title="API Key">
+    ```typescript
+    async connect(alias: string): Promise<SDKClients>
+    ```
+
+    <ParamField path="alias" type="string" required>
+      The alias to connect with (email or phone number)
+    </ParamField>
+  </Tab>
+  <Tab title="JWT">
+    ```typescript
+    async connect(
+      origin: string,
+      alias: string,
+      code: string
+    ): Promise<SDKClients>
+    ```
+
+    <ParamField path="origin" type="string" required>
+      The origin identifier
+    </ParamField>
+
+    <ParamField path="alias" type="string" required>
+      The alias to connect with (email or phone number)
+    </ParamField>
+
+    <ParamField path="code" type="string" required>
+      The OTP code received via email or SMS
+    </ParamField>
+  </Tab>
+</Tabs>
+
+<ResponseField name="accounts" type="AccountsClient">
+  Client for managing accounts
+</ResponseField>
+
+<ResponseField name="compliance" type="ComplianceClient">
+  Client for compliance operations
+</ResponseField>
+
+<ResponseField name="identity" type="IdentityClient">
+  Client for identity management
+</ResponseField>
+
+<ResponseField name="orgs" type="OrgsClient">
+  Client for organization management
+</ResponseField>
+
+<ResponseField name="swap" type="SwapClient">
+  Client for swap operations
+</ResponseField>
+
+<ResponseField name="urn" type="string">
+  The URN of the connected identity
+</ResponseField>
+
+<ResponseField name="accessToken" type="string">
+  The access token for the session
+</ResponseField>
+
+### Example
+
+<Tabs>
+  <Tab title="API Key (Backend)">
+    ```typescript
+    const sdk = new SDK({
+      auth: {
+        type: 'apiKey',
+        apiKey: 'your-api-key'
+      },
+      origin: 'my-origin',
+      platform: 'node'
+    });
+
+    const clients = await sdk.connect('user@example.com');
+    console.log(clients.urn); // did:bloque:my-origin:user@example.com
+    ```
+  </Tab>
+  <Tab title="JWT (Frontend)">
+    ```typescript
+    const sdk = new SDK({
+      auth: { type: 'jwt' },
+      platform: 'browser'
+    });
+
+    // First, request an OTP code
+    await sdk.assert('my-origin', 'user@example.com');
+
+    // Then connect with the code
+    const clients = await sdk.connect(
+      'my-origin',
+      'user@example.com',
+      '123456'
+    );
+
+    console.log(clients.urn); // did:bloque:my-origin:user@example.com
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## assert()
+
+Initiates an OTP challenge for JWT authentication. Sends a verification code to the specified alias.
+
+```typescript
+async assert(origin: string, alias: string): Promise<AssertionResponse>
+```
+
+<Note>
+  This method is only available when using JWT authentication (`auth.type === 'jwt'`).
+</Note>
+
+<ParamField path="origin" type="string" required>
+  The origin identifier
+</ParamField>
+
+<ParamField path="alias" type="string" required>
+  The alias (email or phone number) to send the OTP to
+</ParamField>
+
+<ResponseField name="type" type="'OTP'">
+  The challenge type (always 'OTP')
+</ResponseField>
+
+<ResponseField name="value" type="object">
+  Details about the OTP challenge
+  <ResponseField name="value.phone" type="string">
+    Phone number where OTP was sent (if applicable)
+  </ResponseField>
+  <ResponseField name="value.email" type="string">
+    Email address where OTP was sent (if applicable)
+  </ResponseField>
+  <ResponseField name="value.expires_at" type="number">
+    Unix timestamp when the OTP expires
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="params" type="object">
+  Additional parameters
+  <ResponseField name="params.attempts_remaining" type="number">
+    Number of verification attempts remaining
+  </ResponseField>
+</ResponseField>
+
+### Example
+
+```typescript
+const sdk = new SDK({
+  auth: { type: 'jwt' },
+  platform: 'browser'
+});
+
+const response = await sdk.assert('my-origin', 'user@example.com');
+
+console.log(`OTP sent to ${response.value.email}`);
+console.log(`Expires at: ${new Date(response.value.expires_at * 1000)}`);
+console.log(`Attempts remaining: ${response.params.attempts_remaining}`);
+
+// User enters the code, then:
+const clients = await sdk.connect('my-origin', 'user@example.com', '123456');
+```
+
+---
+
+## SDKClients
+
+The object returned by `authenticate()`, `register()`, and `connect()` contains all available API clients:
+
+```typescript
+interface SDKClients {
+  accounts: AccountsClient;
+  compliance: ComplianceClient;
+  identity: IdentityClient;
+  orgs: OrgsClient;
+  swap: SwapClient;
+  urn: string;
+  accessToken: string;
+}
+```
+
+### accounts
+
+Provides access to account management:
+
+```typescript
+const clients = await sdk.connect('user@example.com');
+
+// Access sub-clients
+const cards = await clients.accounts.card.list();
+const virtualAccounts = await clients.accounts.virtual.list();
+const polygonAccounts = await clients.accounts.polygon.list();
+const bancolombiaAccounts = await clients.accounts.bancolombia.list();
+```
+
+### compliance
+
+Provides access to KYC/KYB verification:
+
+```typescript
+const verification = await clients.compliance.verify({
+  type: 'individual',
+  firstName: 'John',
+  lastName: 'Doe',
+  // ...
+});
+```
+
+### identity
+
+Provides access to identity management:
+
+```typescript
+const profile = await clients.identity.me();
+const aliases = await clients.identity.listAliases();
+```
+
+### orgs
+
+Provides access to organization management:
+
+```typescript
+const organizations = await clients.orgs.list();
+const members = await clients.orgs.listMembers('org-id');
+```
+
+### swap
+
+Provides access to swap operations:
+
+```typescript
+const quote = await clients.swap.quote({
+  from: 'USD',
+  to: 'EUR',
+  amount: 100
+});
+```
+
+### urn
+
+The URN (Uniform Resource Name) of the connected identity:
+
+```typescript
+console.log(clients.urn); // did:bloque:my-origin:user@example.com
+```
+
+### accessToken
+
+The access token for the current session:
+
+```typescript
+console.log(clients.accessToken); // eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```

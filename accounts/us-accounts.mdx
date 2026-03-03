@@ -1,0 +1,563 @@
+---
+title: 'US Bank Accounts'
+description: 'Create and manage FDIC-insured US bank accounts with USClient'
+---
+
+## Overview
+
+The USClient provides methods for creating and managing US bank accounts for individuals and businesses. These accounts are FDIC-insured and provide full ACH capabilities for receiving and sending funds.
+
+## Accessing USClient
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  auth: {
+    type: 'apiKey',
+    apiKey: process.env.BLOQUE_API_KEY,
+  },
+});
+
+const user = await bloque.connect('@username');
+const usClient = user.accounts.us;
+```
+
+## Creating US Bank Accounts
+
+Creating a US bank account is a two-step process:
+
+1. Get a Terms of Service (TOS) acceptance link
+2. Create the account with the signed agreement ID
+
+### Step 1: Get TOS Link
+
+```typescript
+const tosLink = await user.accounts.us.getTosLink({
+  redirectUri: 'https://myapp.com/callback'
+});
+
+console.log(tosLink.url);
+// Example: https://dashboard.bridge.xyz/accept-terms-of-service?session_token=...
+
+// Redirect user to tosLink.url
+// After acceptance, extract signed_agreement_id from callback URL
+```
+
+### Step 2: Create Account
+
+```typescript
+const account = await user.accounts.us.create({
+  type: 'individual',
+  firstName: 'Robert',
+  middleName: 'James',
+  lastName: 'Johnson',
+  email: 'robert.johnson@example.com',
+  phone: '+12125551234',
+  address: {
+    streetLine1: '456 Wall Street',
+    streetLine2: 'Suite 789',
+    city: 'New York',
+    state: 'NY',
+    postalCode: '10005',
+    country: 'US'
+  },
+  birthDate: '1985-03-15',
+  taxIdentificationNumber: '123-45-6789',
+  govIdCountry: 'US',
+  govIdImageFront: 'base64_encoded_image',
+  signedAgreementId: '0d139f8e-14b0-4540-92ba-4e66c619b533'
+});
+
+console.log(account.urn);
+console.log(account.status); // 'creation_in_progress'
+```
+
+### Wait for Active Status
+
+```typescript
+const account = await user.accounts.us.create(
+  {
+    type: 'individual',
+    firstName: 'Robert',
+    lastName: 'Johnson',
+    email: 'robert.johnson@example.com',
+    phone: '+12125551234',
+    address: {
+      streetLine1: '456 Wall Street',
+      city: 'New York',
+      state: 'NY',
+      postalCode: '10005',
+      country: 'US'
+    },
+    birthDate: '1985-03-15',
+    taxIdentificationNumber: '123-45-6789',
+    govIdCountry: 'US',
+    govIdImageFront: 'base64_encoded_image',
+    signedAgreementId: '0d139f8e-14b0-4540-92ba-4e66c619b533'
+  },
+  { waitLedger: true }
+);
+
+console.log(account.status);        // 'active'
+console.log(account.accountNumber); // Bank account number
+console.log(account.routingNumber); // Bank routing number
+```
+
+### Complete Example
+
+```typescript
+// Step 1: Get TOS link
+const tosLink = await user.accounts.us.getTosLink({
+  redirectUri: 'https://myapp.com/callback'
+});
+
+// Redirect user to accept TOS
+window.location.href = tosLink.url;
+
+// Step 2: After callback, create account
+// (Extract signed_agreement_id from callback URL)
+const urlParams = new URLSearchParams(window.location.search);
+const signedAgreementId = urlParams.get('signed_agreement_id');
+
+const account = await user.accounts.us.create(
+  {
+    type: 'individual',
+    firstName: 'Robert',
+    lastName: 'Johnson',
+    email: 'robert.johnson@example.com',
+    phone: '+12125551234',
+    address: {
+      streetLine1: '456 Wall Street',
+      city: 'New York',
+      state: 'NY',
+      postalCode: '10005',
+      country: 'US'
+    },
+    birthDate: '1985-03-15',
+    taxIdentificationNumber: '123-45-6789',
+    govIdCountry: 'US',
+    govIdImageFront: await encodeImageToBase64('path/to/id.jpg'),
+    signedAgreementId,
+  },
+  { waitLedger: true }
+);
+```
+
+## Account Types
+
+US accounts support two types:
+
+- `individual` - Personal bank accounts for individuals
+- `business` - Business bank accounts for companies
+
+## Listing US Accounts
+
+### List All Accounts
+
+```typescript
+const { accounts } = await user.accounts.us.list();
+
+accounts.forEach(account => {
+  console.log(account.urn);
+  console.log(account.type);
+  console.log(account.firstName, account.lastName);
+  console.log(account.accountNumber);
+  console.log(account.routingNumber);
+  console.log(account.status);
+  console.log(account.balance);
+});
+```
+
+### Get Specific Account
+
+```typescript
+const { accounts } = await user.accounts.us.list({
+  urn: 'did:bloque:account:us-account:usr-123:us-456'
+});
+
+const account = accounts[0];
+```
+
+## US Account Details
+
+The `UsAccount` type includes:
+
+<ResponseField name="urn" type="string" required>
+  Unique resource name for the US account
+</ResponseField>
+
+<ResponseField name="id" type="string" required>
+  US account ID
+</ResponseField>
+
+<ResponseField name="type" type="'individual' | 'business'" required>
+  Account type (individual or business)
+</ResponseField>
+
+<ResponseField name="firstName" type="string" required>
+  Account holder's first name
+</ResponseField>
+
+<ResponseField name="middleName" type="string">
+  Account holder's middle name (if provided)
+</ResponseField>
+
+<ResponseField name="lastName" type="string" required>
+  Account holder's last name
+</ResponseField>
+
+<ResponseField name="email" type="string" required>
+  Email address
+</ResponseField>
+
+<ResponseField name="phone" type="string" required>
+  Phone number with country code
+</ResponseField>
+
+<ResponseField name="address" type="UsAccountAddress" required>
+  Account holder's address
+</ResponseField>
+
+<ResponseField name="birthDate" type="string" required>
+  Birth date in YYYY-MM-DD format
+</ResponseField>
+
+<ResponseField name="accountNumber" type="string">
+  Bank account number (if available)
+</ResponseField>
+
+<ResponseField name="routingNumber" type="string">
+  Bank routing number (if available)
+</ResponseField>
+
+<ResponseField name="status" type="AccountStatus" required>
+  Current status: `creation_in_progress`, `active`, `disabled`, `frozen`, `deleted`, or `creation_failed`
+</ResponseField>
+
+<ResponseField name="ownerUrn" type="string" required>
+  URN of the account owner
+</ResponseField>
+
+<ResponseField name="ledgerId" type="string" required>
+  Ledger account ID associated with this account
+</ResponseField>
+
+<ResponseField name="webhookUrl" type="string | null">
+  Webhook URL for account events (if configured)
+</ResponseField>
+
+<ResponseField name="metadata" type="Record<string, unknown>">
+  Custom metadata attached to the account
+</ResponseField>
+
+<ResponseField name="balance" type="Record<string, TokenBalance>">
+  Token balances by asset (only included in list responses)
+</ResponseField>
+
+## Managing US Accounts
+
+### Update Metadata
+
+```typescript
+const account = await user.accounts.us.updateMetadata({
+  urn: 'did:bloque:mediums:us-account:account:123',
+  metadata: {
+    updated_by: 'admin',
+    update_reason: 'customer_request',
+  },
+});
+```
+
+### Activate Account
+
+```typescript
+const account = await user.accounts.us.activate(
+  'did:bloque:mediums:us-account:account:123'
+);
+
+console.log(account.status); // 'active'
+```
+
+### Freeze Account
+
+```typescript
+const account = await user.accounts.us.freeze(
+  'did:bloque:mediums:us-account:account:123'
+);
+
+console.log(account.status); // 'frozen'
+```
+
+### Disable Account
+
+```typescript
+const account = await user.accounts.us.disable(
+  'did:bloque:mediums:us-account:account:123'
+);
+
+console.log(account.status); // 'disabled'
+```
+
+## Using US Accounts
+
+### Check Balance
+
+Use the general `accounts.balance()` method:
+
+```typescript
+const balance = await user.accounts.balance(
+  'did:bloque:account:us-account:usr-123:us-456'
+);
+
+Object.entries(balance).forEach(([asset, b]) => {
+  console.log(`${asset}:`);
+  console.log(`  Current: ${b.current}`);
+  console.log(`  Pending: ${b.pending}`);
+  console.log(`  In: ${b.in}`);
+  console.log(`  Out: ${b.out}`);
+});
+```
+
+### Transfer Funds
+
+```typescript
+// Transfer from US account to virtual account
+const transfer = await user.accounts.transfer({
+  sourceUrn: 'did:bloque:account:us-account:usr-123:us-456',
+  destinationUrn: 'did:bloque:account:virtual:acc-12345',
+  amount: '100000000',
+  asset: 'DUSD/6',
+  metadata: {
+    reference: 'internal-transfer',
+  },
+});
+```
+
+### View Transaction History
+
+```typescript
+const { data, hasMore, next } = await user.accounts.movements({
+  urn: 'did:bloque:account:us-account:usr-123:us-456',
+  asset: 'DUSD/6',
+  limit: 50,
+});
+
+data.forEach(movement => {
+  console.log(movement.type);      // 'deposit' | 'withdraw' | 'transfer'
+  console.log(movement.amount);
+  console.log(movement.direction); // 'in' | 'out'
+  console.log(movement.status);
+});
+```
+
+## Common Use Cases
+
+### Business Payroll
+
+Create a US account for handling payroll:
+
+```typescript
+const payrollAccount = await user.accounts.us.create(
+  {
+    type: 'business',
+    firstName: 'Acme',
+    lastName: 'Corporation',
+    email: 'payroll@acme.com',
+    phone: '+12125551234',
+    address: {
+      streetLine1: '123 Business Ave',
+      city: 'New York',
+      state: 'NY',
+      postalCode: '10001',
+      country: 'US'
+    },
+    birthDate: '2020-01-01',
+    taxIdentificationNumber: '12-3456789',
+    govIdCountry: 'US',
+    govIdImageFront: businessDocumentBase64,
+    signedAgreementId,
+    name: 'Payroll Account',
+  },
+  { waitLedger: true }
+);
+
+// Execute batch payroll transfers
+const payroll = await user.accounts.batchTransfer({
+  reference: 'payroll-2024-01-15',
+  operations: employees.map(emp => ({
+    fromUrn: payrollAccount.urn,
+    toUrn: emp.accountUrn,
+    reference: `payroll-${emp.id}`,
+    amount: emp.salary,
+    asset: 'DUSD/6',
+  })),
+});
+```
+
+### Accepting ACH Payments
+
+```typescript
+const account = await user.accounts.us.create(
+  {
+    type: 'individual',
+    // ... account details ...
+    webhookUrl: 'https://api.example.com/webhooks/ach-payments',
+  },
+  { waitLedger: true }
+);
+
+console.log('Account Number:', account.accountNumber);
+console.log('Routing Number:', account.routingNumber);
+
+// Provide these to payers for ACH deposits
+// Your webhook will be notified when funds arrive
+```
+
+### Multi-Currency Operations
+
+Combine US accounts with other account types:
+
+```typescript
+// Create US account
+const usAccount = await user.accounts.us.create(
+  { /* ... */ },
+  { waitLedger: true }
+);
+
+// Create Polygon wallet linked to same ledger
+const polygon = await user.accounts.polygon.create(
+  {
+    ledgerId: usAccount.ledgerId,
+  },
+  { waitLedger: true }
+);
+
+// Now you can:
+// 1. Receive ACH in USD
+// 2. Convert to crypto
+// 3. Transfer to Polygon wallet
+```
+
+## API Reference
+
+### getTosLink()
+
+Get Terms of Service acceptance link.
+
+<ParamField path="params" type="GetTosLinkParams" required>
+  <ParamField path="redirectUri" type="string" required>
+    Redirect URI after user accepts terms of service
+  </ParamField>
+</ParamField>
+
+### create()
+
+Create a new US bank account.
+
+<ParamField path="params" type="CreateUsAccountParams" required>
+  <ParamField path="type" type="'individual' | 'business'" required>
+    Account type
+  </ParamField>
+  <ParamField path="firstName" type="string" required>
+    First name
+  </ParamField>
+  <ParamField path="middleName" type="string">
+    Middle name (optional)
+  </ParamField>
+  <ParamField path="lastName" type="string" required>
+    Last name
+  </ParamField>
+  <ParamField path="email" type="string" required>
+    Email address
+  </ParamField>
+  <ParamField path="phone" type="string" required>
+    Phone number with country code (e.g., +12125551234)
+  </ParamField>
+  <ParamField path="address" type="UsAccountAddress" required>
+    Address information
+  </ParamField>
+  <ParamField path="birthDate" type="string" required>
+    Birth date in YYYY-MM-DD format
+  </ParamField>
+  <ParamField path="taxIdentificationNumber" type="string" required>
+    SSN for individuals, EIN for businesses
+  </ParamField>
+  <ParamField path="govIdCountry" type="string" required>
+    Government ID issuing country (2-letter code)
+  </ParamField>
+  <ParamField path="govIdImageFront" type="string" required>
+    Base64-encoded image of government ID front
+  </ParamField>
+  <ParamField path="signedAgreementId" type="string" required>
+    Signed agreement ID obtained from getTosLink
+  </ParamField>
+  <ParamField path="name" type="string">
+    Display name for the account
+  </ParamField>
+  <ParamField path="webhookUrl" type="string">
+    Webhook URL to receive account events
+  </ParamField>
+  <ParamField path="ledgerId" type="string">
+    Ledger account ID to associate with this account
+  </ParamField>
+  <ParamField path="metadata" type="Record<string, unknown>">
+    Custom metadata to associate with the account
+  </ParamField>
+</ParamField>
+
+<ParamField path="options" type="CreateAccountOptions">
+  <ParamField path="waitLedger" type="boolean" default={false}>
+    If true, wait for the account to become active before returning
+  </ParamField>
+  <ParamField path="timeout" type="number" default={60000}>
+    Maximum time to wait in milliseconds (only applies when waitLedger is true)
+  </ParamField>
+</ParamField>
+
+### list()
+
+List US bank accounts.
+
+<ParamField path="params" type="ListUsAccountsParams">
+  <ParamField path="urn" type="string">
+    URN of a specific US account to retrieve
+  </ParamField>
+</ParamField>
+
+### updateMetadata()
+
+Update US account metadata.
+
+<ParamField path="params" type="UpdateUsMetadataParams" required>
+  <ParamField path="urn" type="string" required>
+    URN of the US account to update
+  </ParamField>
+  <ParamField path="metadata" type="Record<string, unknown>" required>
+    Metadata to update
+  </ParamField>
+</ParamField>
+
+### activate()
+
+Activate a US account.
+
+<ParamField path="urn" type="string" required>
+  US account URN
+</ParamField>
+
+### freeze()
+
+Freeze a US account.
+
+<ParamField path="urn" type="string" required>
+  US account URN
+</ParamField>
+
+### disable()
+
+Disable a US account.
+
+<ParamField path="urn" type="string" required>
+  US account URN
+</ParamField>

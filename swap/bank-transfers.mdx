@@ -1,0 +1,601 @@
+---
+title: 'Bank Transfer Orders'
+description: 'Cash out to any Colombian bank via swap orders'
+icon: 'money-bill-transfer'
+---
+
+## Overview
+
+The Bank Transfer client enables cash-outs from Kusama to any supported Colombian bank. Unlike PSE (which handles cash-ins), bank transfers are used for withdrawals.
+
+## Features
+
+- Support for 30+ Colombian banks
+- Generic API works with all banks
+- Cash out from Kusama to bank accounts
+- Direct bank account deposits
+
+## Supported Banks
+
+The `toMedium` parameter accepts any of these bank identifiers:
+
+<AccordionGroup>
+  <Accordion title="Major Banks">
+    - `bancolombia` - Bancolombia
+    - `banco_de_bogota` - Banco de Bogotá
+    - `banco_davivienda` - Davivienda
+    - `banco_bbva_colombia` - BBVA Colombia
+    - `banco_popular` - Banco Popular
+    - `banco_de_occidente` - Banco de Occidente
+  </Accordion>
+  
+  <Accordion title="All Supported Banks">
+    - `banco_agrario_de_colombia`
+    - `banco_av_villas`
+    - `banco_bancamia`
+    - `banco_bbva_colombia`
+    - `banco_btg_pactual_colombia`
+    - `citibank_colombia`
+    - `banco_caja_social_bcsc`
+    - `davibank`
+    - `banco_contactar`
+    - `banco_cooperativo_coopcentral`
+    - `ban100`
+    - `banco_davivienda`
+    - `banco_de_bogota`
+    - `banco_de_occidente`
+    - `banco_gnb_sudameris`
+    - `banco_jp_morgan_colombia`
+    - `banco_popular`
+    - `banco_itau`
+    - `bancolombia`
+    - `banco_w`
+    - `banco_coomeva`
+    - `banco_finandina_bic`
+    - `banco_falabella`
+    - `banco_pichincha`
+    - `banco_santander_de_negocios_colombia`
+    - `banco_mundo_mujer`
+    - `banco_serfinanza`
+    - `mibanco`
+    - `lulo_bank`
+    - `banco_union`
+  </Accordion>
+</AccordionGroup>
+
+## Create Bank Transfer Order
+
+Cash out from Kusama to a Colombian bank account:
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  origin: process.env.ORIGIN,
+  auth: { type: 'apiKey', apiKey: process.env.API_KEY },
+  mode: 'sandbox',
+  platform: 'node'
+});
+
+const user = await bloque.connect('nestor');
+
+// 1. Find rates for Kusama to bank transfer
+const rates = await user.swap.findRates({
+  fromAsset: 'DUSD/6',
+  toAsset: 'COP/2',
+  fromMediums: ['kusama'],
+  toMediums: ['bancolombia'], // or any supported bank
+  amountSrc: '1000000' // 1.000000 DUSD
+});
+
+// 2. Create bank transfer order
+const result = await user.swap.bankTransfer.create({
+  rateSig: rates.rates[0].sig,
+  toMedium: 'bancolombia',
+  amountSrc: '1000000',
+  depositInformation: {
+    bankAccountType: 'savings',
+    bankAccountNumber: '5740088718',
+    bankAccountHolderName: 'Juan Pérez',
+    bankAccountHolderIdentificationType: 'CC',
+    bankAccountHolderIdentificationValue: '1234567890'
+  },
+  args: {
+    sourceAccountUrn: 'did:bloque:card:abc123'
+  }
+});
+
+console.log('Transfer order created:', result.order.id);
+console.log('Status:', result.order.status);
+```
+
+## Parameters
+
+<ParamField path="rateSig" type="string" required>
+  Rate signature obtained from `findRates`
+  
+  ```typescript
+  const rates = await user.swap.findRates({...});
+  const rateSig = rates.rates[0].sig;
+  ```
+</ParamField>
+
+<ParamField path="toMedium" type="SupportedBank" required>
+  Destination bank identifier
+  
+  **Examples**: `"bancolombia"`, `"banco_de_bogota"`, `"banco_davivienda"`
+  
+  See [Supported Banks](#supported-banks) for full list
+</ParamField>
+
+<ParamField path="amountSrc" type="string">
+  Source amount as scaled bigint string (required if `type` is `'src'`)
+  
+  **Example**: `"1000000"` = 1.000000 DUSD for DUSD/6
+</ParamField>
+
+<ParamField path="amountDst" type="string">
+  Destination amount as scaled bigint string (required if `type` is `'dst'`)
+  
+  **Example**: `"5000000"` = 50,000.00 COP for COP/2
+</ParamField>
+
+<ParamField path="type" type="'src' | 'dst'" default="src">
+  Order type:
+  - `src`: Specify exact source amount to swap
+  - `dst`: Specify exact destination amount to receive
+</ParamField>
+
+<ParamField path="depositInformation" type="BankDepositInformation" required>
+  Bank account information for fund delivery
+  
+  <Expandable title="BankDepositInformation">
+    <ParamField path="depositInformation.bankAccountType" type="'savings' | 'checking'" required>
+      Type of bank account
+      
+      **Values**:
+      - `savings`: Savings account (Cuenta de Ahorros)
+      - `checking`: Checking account (Cuenta Corriente)
+    </ParamField>
+    
+    <ParamField path="depositInformation.bankAccountNumber" type="string" required>
+      Bank account number
+      
+      **Example**: `"5740088718"`
+    </ParamField>
+    
+    <ParamField path="depositInformation.bankAccountHolderName" type="string" required>
+      Full name of the account holder as it appears on the bank account
+      
+      **Example**: `"Juan Pérez"`, `"María López"`
+    </ParamField>
+    
+    <ParamField path="depositInformation.bankAccountHolderIdentificationType" type="'CC' | 'CE' | 'NIT' | 'PP'" required>
+      Type of identification document
+      
+      **Values**:
+      - `CC`: Cédula de Ciudadanía (Citizenship Card)
+      - `CE`: Cédula de Extranjería (Foreigner ID)
+      - `NIT`: Número de Identificación Tributaria (Tax ID)
+      - `PP`: Pasaporte (Passport)
+    </ParamField>
+    
+    <ParamField path="depositInformation.bankAccountHolderIdentificationValue" type="string" required>
+      Identification number
+      
+      **Example**: `"1234567890"`
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="args" type="KusamaAccountArgs" required>
+  Kusama account arguments for swap execution
+  
+  <Expandable title="KusamaAccountArgs">
+    <ParamField path="args.sourceAccountUrn" type="string" required>
+      URN of the Kusama account to debit funds from
+      
+      **Example**: `"did:bloque:card:abc123"`
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="webhookUrl" type="string">
+  Optional webhook URL for order status notifications
+</ParamField>
+
+<ParamField path="nodeId" type="string">
+  Specific instruction node ID to execute (defaults to first node)
+</ParamField>
+
+<ParamField path="metadata" type="Record<string, unknown>">
+  Additional metadata to attach to the order
+  
+  **Example**: `{ reference: 'WITHDRAWAL-123', userId: 'user-456' }`
+</ParamField>
+
+## Response
+
+The response structure is identical to PSE orders:
+
+<ResponseField name="order" type="SwapOrder">
+  The created swap order
+  
+  <Expandable title="SwapOrder">
+    <ResponseField name="id" type="string">
+      Unique order identifier
+    </ResponseField>
+    
+    <ResponseField name="fromMedium" type="string">
+      Source medium (always `"kusama"` for bank transfers)
+    </ResponseField>
+    
+    <ResponseField name="toMedium" type="string">
+      Destination bank (e.g., `"bancolombia"`, `"banco_de_bogota"`)
+    </ResponseField>
+    
+    <ResponseField name="fromAmount" type="string">
+      Amount debited from Kusama account (DUSD)
+    </ResponseField>
+    
+    <ResponseField name="toAmount" type="string">
+      Amount deposited to bank account (COP)
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Order status (e.g., `"pending"`, `"processing"`, `"completed"`)
+    </ResponseField>
+    
+    <ResponseField name="graphId" type="string">
+      Instruction graph ID for tracking execution
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="execution" type="ExecutionResult">
+  Execution result from auto-execution (if `args` were provided)
+</ResponseField>
+
+<ResponseField name="requestId" type="string">
+  Request ID for tracking and support
+</ResponseField>
+
+## Bank Transfer Flow
+
+```typescript
+// 1. User requests withdrawal to their bank
+const withdrawAmount = '1000000'; // 1.000000 DUSD
+
+// 2. Find available rates
+const rates = await user.swap.findRates({
+  fromAsset: 'DUSD/6',
+  toAsset: 'COP/2',
+  fromMediums: ['kusama'],
+  toMediums: ['bancolombia', 'banco_de_bogota', 'banco_davivienda'],
+  amountSrc: withdrawAmount
+});
+
+if (rates.rates.length === 0) {
+  throw new Error('No rates available for withdrawal');
+}
+
+// 3. Show user the conversion and fees
+const bestRate = rates.rates[0];
+const copAmount = Number(withdrawAmount) * bestRate.ratio;
+const fee = bestRate.fee.value;
+const netAmount = copAmount - fee;
+
+console.log(`You withdraw: ${Number(withdrawAmount) / 1000000} DUSD`);
+console.log(`You receive: ${netAmount / 100} COP`);
+console.log(`Fee: ${fee / 100} COP`);
+
+// 4. User provides bank account details
+const bankDetails = {
+  bank: 'bancolombia',
+  accountType: 'savings',
+  accountNumber: '5740088718',
+  holderName: 'Juan Pérez',
+  idType: 'CC',
+  idNumber: '1234567890'
+};
+
+// 5. Create the transfer order
+const result = await user.swap.bankTransfer.create({
+  rateSig: bestRate.sig,
+  toMedium: bankDetails.bank,
+  amountSrc: withdrawAmount,
+  depositInformation: {
+    bankAccountType: bankDetails.accountType,
+    bankAccountNumber: bankDetails.accountNumber,
+    bankAccountHolderName: bankDetails.holderName,
+    bankAccountHolderIdentificationType: bankDetails.idType,
+    bankAccountHolderIdentificationValue: bankDetails.idNumber
+  },
+  args: {
+    sourceAccountUrn: 'did:bloque:card:abc123'
+  },
+  webhookUrl: 'https://yourapp.com/webhooks/transfers',
+  metadata: {
+    userId: 'user-123',
+    withdrawalId: 'withdrawal-456'
+  }
+});
+
+console.log('Transfer initiated:', result.order.id);
+console.log('Status:', result.order.status);
+
+// 6. Monitor order status via webhooks
+// Bloque sends updates to your webhook URL:
+// {
+//   "orderId": "ord-123",
+//   "status": "completed",
+//   "fromAmount": "1000000",
+//   "toAmount": "4000000"
+// }
+```
+
+## Account Type Selection
+
+Help users select the correct account type:
+
+```typescript
+// Display account type options
+const accountTypes = [
+  {
+    value: 'savings',
+    label: 'Cuenta de Ahorros (Savings)',
+    description: 'Most common account type for individuals'
+  },
+  {
+    value: 'checking',
+    label: 'Cuenta Corriente (Checking)',
+    description: 'Business accounts or high-volume transactions'
+  }
+];
+
+// Validate account number format
+function validateAccountNumber(accountNumber: string, bank: string): boolean {
+  // Different banks have different account number formats
+  // Add validation logic based on bank requirements
+  return /^\d{9,20}$/.test(accountNumber);
+}
+```
+
+## Handling Different Banks
+
+Each bank may have specific requirements:
+
+```typescript
+// Example: Show bank-specific information
+const bankInfo = {
+  bancolombia: {
+    name: 'Bancolombia',
+    accountNumberLength: [10, 11],
+    processingTime: '1-2 business days'
+  },
+  banco_de_bogota: {
+    name: 'Banco de Bogotá',
+    accountNumberLength: [10],
+    processingTime: '1-3 business days'
+  },
+  banco_davivienda: {
+    name: 'Davivienda',
+    accountNumberLength: [10, 11],
+    processingTime: '1-2 business days'
+  }
+};
+
+const selectedBank = 'bancolombia';
+const info = bankInfo[selectedBank];
+
+console.log(`Bank: ${info.name}`);
+console.log(`Account number should be ${info.accountNumberLength.join(' or ')} digits`);
+console.log(`Expected processing time: ${info.processingTime}`);
+```
+
+## Validation Best Practices
+
+<AccordionGroup>
+  <Accordion title="Validate Account Holder Name">
+    Ensure the name matches the bank account:
+    
+    ```typescript
+    function validateHolderName(name: string): boolean {
+      // Remove extra spaces
+      const cleaned = name.trim().replace(/\s+/g, ' ');
+      
+      // Check minimum length
+      if (cleaned.length < 3) {
+        return false;
+      }
+      
+      // Check for special characters (basic validation)
+      // Banks typically only accept letters, spaces, and some accents
+      return /^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(cleaned);
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Validate Identification">
+    Validate ID numbers based on type:
+    
+    ```typescript
+    function validateIdentification(
+      type: string, 
+      value: string
+    ): boolean {
+      switch (type) {
+        case 'CC':
+          // Cédula: 6-10 digits
+          return /^\d{6,10}$/.test(value);
+        case 'CE':
+          // Cédula de Extranjería: 6-7 digits
+          return /^\d{6,7}$/.test(value);
+        case 'NIT':
+          // NIT: 9-10 digits + verification digit
+          return /^\d{9,10}-?\d$/.test(value);
+        case 'PP':
+          // Passport: alphanumeric
+          return /^[A-Z0-9]{6,20}$/.test(value);
+        default:
+          return false;
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Check Transfer Limits">
+    Validate amounts against rate limits:
+    
+    ```typescript
+    const rate = rates.rates[0];
+    const [minFrom, maxFrom] = rate.fromLimits;
+    const userAmount = '1000000';
+    
+    if (BigInt(userAmount) < BigInt(minFrom)) {
+      const minDUSD = Number(minFrom) / 1000000;
+      throw new Error(
+        `Minimum withdrawal is ${minDUSD} DUSD`
+      );
+    }
+    
+    if (BigInt(userAmount) > BigInt(maxFrom)) {
+      const maxDUSD = Number(maxFrom) / 1000000;
+      throw new Error(
+        `Maximum withdrawal is ${maxDUSD} DUSD`
+      );
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Webhook Handling
+
+Monitor transfer status via webhooks:
+
+```typescript
+// Express.js example
+app.post('/webhooks/transfers', async (req, res) => {
+  const { orderId, status, fromAmount, toAmount, toMedium } = req.body;
+  
+  // Update database
+  await db.transfers.update(orderId, {
+    status,
+    fromAmount,
+    toAmount,
+    updatedAt: new Date()
+  });
+  
+  // Notify user based on status
+  if (status === 'completed') {
+    const copAmount = Number(toAmount) / 100;
+    await sendEmail({
+      to: user.email,
+      subject: 'Transfer Completed',
+      body: `Your withdrawal of ${copAmount} COP to ${toMedium} was successful.`
+    });
+  } else if (status === 'failed') {
+    await sendEmail({
+      to: user.email,
+      subject: 'Transfer Failed',
+      body: 'Your withdrawal failed. Please contact support.'
+    });
+  } else if (status === 'processing') {
+    await sendEmail({
+      to: user.email,
+      subject: 'Transfer Processing',
+      body: 'Your withdrawal is being processed.'
+    });
+  }
+  
+  res.status(200).send('OK');
+});
+```
+
+## Error Handling
+
+```typescript
+import { 
+  BloqueAPIError,
+  BloqueValidationError,
+  BloqueInsufficientFundsError 
+} from '@bloque/sdk';
+
+try {
+  const result = await user.swap.bankTransfer.create({...});
+} catch (error) {
+  if (error instanceof BloqueInsufficientFundsError) {
+    // Not enough DUSD in Kusama account
+    console.error('Insufficient funds for withdrawal');
+    // Show user their current balance
+  } else if (error instanceof BloqueValidationError) {
+    // Invalid bank account details
+    console.error('Invalid bank information:', error.message);
+    // Ask user to verify their bank details
+  } else if (error instanceof BloqueAPIError) {
+    console.error('API error:', error.requestId);
+    console.error('Message:', error.message);
+  }
+}
+```
+
+## Complete Example
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  origin: process.env.ORIGIN,
+  auth: { type: 'apiKey', apiKey: process.env.API_KEY },
+  mode: 'sandbox',
+  platform: 'node'
+});
+
+const user = await bloque.connect('nestor');
+
+// Withdraw 1 DUSD to Bancolombia
+const rates = await user.swap.findRates({
+  fromAsset: 'DUSD/6',
+  toAsset: 'COP/2',
+  fromMediums: ['kusama'],
+  toMediums: ['bancolombia'],
+  amountSrc: '1000000'
+});
+
+const result = await user.swap.bankTransfer.create({
+  rateSig: rates.rates[0].sig,
+  toMedium: 'bancolombia',
+  amountSrc: '1000000',
+  depositInformation: {
+    bankAccountType: 'savings',
+    bankAccountNumber: '5740088718',
+    bankAccountHolderName: 'Juan Pérez',
+    bankAccountHolderIdentificationType: 'CC',
+    bankAccountHolderIdentificationValue: '1234567890'
+  },
+  args: {
+    sourceAccountUrn: 'did:bloque:card:abc123'
+  },
+  webhookUrl: 'https://myapp.com/webhooks/transfers',
+  metadata: {
+    userId: 'user-123',
+    reference: 'WITHDRAW-001'
+  }
+});
+
+console.log('Transfer order:', result.order.id);
+console.log('Status:', result.order.status);
+console.log('From amount:', result.order.fromAmount, 'DUSD');
+console.log('To amount:', result.order.toAmount, 'COP');
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Exchange Rates" icon="chart-line" href="/swap/rates">
+    Learn more about finding and using exchange rates
+  </Card>
+  <Card title="PSE Integration" icon="building-columns" href="/swap/pse">
+    Accept cash-in payments via PSE
+  </Card>
+</CardGroup>

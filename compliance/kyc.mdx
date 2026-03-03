@@ -1,0 +1,323 @@
+---
+title: KYC Verification
+description: Verify user identities with Know Your Customer (KYC) compliance
+---
+
+## Overview
+
+The KYC (Know Your Customer) module provides identity verification services to ensure compliance with regulatory requirements. Bloque uses AMLBOT as the verification provider to perform identity checks.
+
+## What is KYC?
+
+KYC verification confirms a user's identity by validating government-issued documents and performing anti-money laundering (AML) checks. This is required for financial services and regulated industries.
+
+## KYC Client
+
+Access KYC functionality through the compliance client:
+
+```typescript
+const kyc = bloque.compliance.kyc;
+```
+
+## Start KYC Verification
+
+Initiate a KYC verification process for a user:
+
+```typescript compliance/src/kyc/types.ts
+interface KycVerificationParams {
+  urn: string;          // Identity URN to verify
+  webhookUrl?: string;  // Optional webhook for status updates
+}
+```
+
+### Example: Basic KYC Verification
+
+```typescript
+const verification = await bloque.compliance.kyc.startVerification({
+  urn: 'did:bloque:origin:ethereum-mainnet:0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6'
+});
+
+console.log('Verification URL:', verification.url);
+console.log('Status:', verification.status);
+```
+
+Direct the user to `verification.url` to complete their KYC verification.
+
+### Example: With Webhook Notifications
+
+```typescript
+const verification = await bloque.compliance.kyc.startVerification({
+  urn: userUrn,
+  webhookUrl: 'https://api.example.com/webhooks/kyc'
+});
+
+console.log('Verification started');
+console.log('Redirect user to:', verification.url);
+```
+
+You'll receive webhook notifications when the verification status changes.
+
+## Get Verification Status
+
+Check the current status of a KYC verification:
+
+```typescript
+const status = await bloque.compliance.kyc.getVerification({
+  urn: userUrn
+});
+
+console.log('Status:', status.status);
+console.log('Verification URL:', status.url);
+
+if (status.completedAt) {
+  console.log('Completed at:', status.completedAt);
+}
+```
+
+## Verification Response
+
+```typescript compliance/src/kyc/types.ts
+interface KycVerificationResponse {
+  status: 'awaiting_compliance_verification' | 'approved' | 'rejected';
+  url: string;              // URL for user to complete verification
+  completedAt: string | null;  // ISO 8601 timestamp when completed
+}
+```
+
+## Verification Status Values
+
+| Status | Description |
+|--------|-------------|
+| `awaiting_compliance_verification` | Verification is in progress or not yet started |
+| `approved` | User has been successfully verified |
+| `rejected` | Verification was rejected (failed checks) |
+
+## Verification Flow
+
+<Steps>
+  <Step title="Register Identity">
+    First, register the user's identity using the Identity Origins API:
+    
+    ```typescript
+    const registration = await bloque.identity.origins.register(
+      alias,
+      origin,
+      registerParams
+    );
+    ```
+  </Step>
+
+  <Step title="Start KYC Verification">
+    Initiate KYC verification for the registered identity:
+    
+    ```typescript
+    const verification = await bloque.compliance.kyc.startVerification({
+      urn: registration.urn,
+      webhookUrl: 'https://api.example.com/webhooks/kyc'
+    });
+    ```
+  </Step>
+
+  <Step title="Redirect User">
+    Direct the user to the verification URL to complete the process:
+    
+    ```typescript
+    // In your web app
+    window.location.href = verification.url;
+    ```
+  </Step>
+
+  <Step title="Monitor Status">
+    Check verification status or wait for webhook notifications:
+    
+    ```typescript
+    const status = await bloque.compliance.kyc.getVerification({
+      urn: userUrn
+    });
+    
+    if (status.status === 'approved') {
+      console.log('User verified!');
+    }
+    ```
+  </Step>
+</Steps>
+
+## Webhook Integration
+
+Receive real-time updates when verification status changes:
+
+```typescript
+// Express.js webhook endpoint example
+app.post('/webhooks/kyc', async (req, res) => {
+  const { urn, status, completedAt } = req.body;
+  
+  console.log('KYC status update:', { urn, status, completedAt });
+  
+  if (status === 'approved') {
+    // Enable user account features
+    await enableUserAccount(urn);
+  } else if (status === 'rejected') {
+    // Notify user of rejection
+    await notifyUserRejection(urn);
+  }
+  
+  res.status(200).send('OK');
+});
+```
+
+<Warning>
+  Always validate webhook signatures in production to ensure requests are authentic.
+</Warning>
+
+## Complete Example
+
+```typescript
+// 1. Register user identity
+const registration = await bloque.identity.origins.register(
+  'user@example.com',
+  'bloque-email',
+  {
+    type: 'individual',
+    profile: {
+      firstName: 'John',
+      lastName: 'Doe',
+      email: 'user@example.com',
+      birthdate: '1990-01-15',
+      city: 'New York',
+      state: 'NY'
+    },
+    assertionResult: emailAssertion
+  }
+);
+
+// 2. Get the user's identity
+const me = await bloque.identity.me();
+
+// 3. Start KYC verification
+const verification = await bloque.compliance.kyc.startVerification({
+  urn: me.urn,
+  webhookUrl: 'https://api.example.com/webhooks/kyc'
+});
+
+// 4. Redirect user to verification
+console.log('Complete verification at:', verification.url);
+
+// 5. Check status later
+setTimeout(async () => {
+  const status = await bloque.compliance.kyc.getVerification({
+    urn: me.urn
+  });
+  
+  console.log('Current status:', status.status);
+  
+  if (status.status === 'approved') {
+    console.log('Verification completed at:', status.completedAt);
+  }
+}, 300000); // Check after 5 minutes
+```
+
+## Verification Provider
+
+Bloque uses **AMLBOT** as the KYC verification provider. AMLBOT performs:
+
+- Identity document verification
+- Biometric facial recognition
+- Anti-Money Laundering (AML) checks
+- Sanctions list screening
+- Politically Exposed Person (PEP) checks
+
+## Verification Levels
+
+Currently, Bloque supports:
+
+- **Basic KYC** - Standard identity verification with document upload and facial recognition
+
+Additional verification levels may be added in the future.
+
+## Error Handling
+
+```typescript
+import { 
+  BloqueValidationError, 
+  BloqueNotFoundError 
+} from '@bloque/sdk-core';
+
+try {
+  const verification = await bloque.compliance.kyc.startVerification({
+    urn: userUrn,
+    webhookUrl: invalidUrl // Invalid URL format
+  });
+} catch (error) {
+  if (error instanceof BloqueValidationError) {
+    console.error('Invalid parameters:', error.message);
+  } else if (error instanceof BloqueNotFoundError) {
+    console.error('Identity not found:', error.message);
+  }
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Verify Before Critical Operations">
+    Always check KYC status before allowing users to:
+    - Create financial accounts
+    - Perform large transactions
+    - Access regulated features
+    
+    ```typescript
+    const status = await bloque.compliance.kyc.getVerification({ urn: userUrn });
+    
+    if (status.status !== 'approved') {
+      throw new Error('KYC verification required');
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Use Webhooks for Production">
+    Don't poll for status updates. Use webhooks to receive real-time notifications:
+    
+    ```typescript
+    const verification = await bloque.compliance.kyc.startVerification({
+      urn: userUrn,
+      webhookUrl: 'https://api.example.com/webhooks/kyc'
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Handle Rejections Gracefully">
+    Provide clear messaging when verification is rejected:
+    
+    ```typescript
+    if (status.status === 'rejected') {
+      // Inform user and provide support contact
+      await sendEmail(user.email, {
+        subject: 'Verification Status',
+        body: 'Your verification was not approved. Please contact support.'
+      });
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Secure Webhook Endpoints">
+    - Use HTTPS for webhook URLs
+    - Validate webhook signatures
+    - Implement rate limiting
+    - Log all webhook events for audit trails
+  </Accordion>
+</AccordionGroup>
+
+<Info>
+  KYC verification is required for creating financial accounts (cards, bank accounts) and performing certain transactions.
+</Info>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Identity" icon="user" href="/identity/overview">
+    Register identities before KYC
+  </Card>
+  <Card title="Accounts" icon="credit-card" href="/accounts/overview">
+    Create accounts after verification
+  </Card>
+</CardGroup>

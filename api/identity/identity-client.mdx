@@ -1,0 +1,171 @@
+---
+title: 'IdentityClient'
+description: 'Main client for managing identities, aliases, and origins'
+---
+
+## Overview
+
+The `IdentityClient` provides access to identity management functionality including user profiles, aliases, and origin management.
+
+```typescript
+import { BloqueSDK } from '@bloque/sdk';
+
+const bloque = await BloqueSDK.connect({
+  apiKey: 'your-api-key',
+  platform: 'node'
+});
+
+// Access identity client
+const identity = bloque.identity;
+```
+
+## Properties
+
+### aliases
+
+<ResponseField name="aliases" type="AliasesClient">
+  Client for managing user aliases (phone numbers, emails, etc.)
+  
+  See [AliasesClient](/api/identity/aliases-client) for details.
+</ResponseField>
+
+### origins
+
+<ResponseField name="origins" type="OriginsClient">
+  Client for managing identity origins and registration
+  
+  See [OriginsClient](/api/identity/origins-client) for details.
+</ResponseField>
+
+## Methods
+
+### me()
+
+Retrieve the authenticated user's identity information including profile data, status, and metadata.
+
+```typescript
+const identity = await bloque.identity.me();
+console.log(identity.urn); // "did:bloque:origin:..."
+console.log(identity.profile.email); // User's email
+```
+
+#### Returns
+
+<ResponseField name="urn" type="string" required>
+  Unique resource name (URN) identifying the identity
+</ResponseField>
+
+<ResponseField name="origin" type="string" required>
+  Origin namespace where the identity was registered
+</ResponseField>
+
+<ResponseField name="type" type="string" required>
+  Type of identity (e.g., "individual", "business")
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Current status of the identity
+</ResponseField>
+
+<ResponseField name="metadata" type="Record<string, unknown>" required>
+  Additional metadata associated with the identity
+</ResponseField>
+
+<ResponseField name="profile" type="object" required>
+  User profile information
+  
+  <Expandable title="Profile Fields">
+    <ResponseField name="first_name" type="string" required>
+      User's first name
+    </ResponseField>
+    
+    <ResponseField name="last_name" type="string" required>
+      User's last name
+    </ResponseField>
+    
+    <ResponseField name="email" type="string" required>
+      User's email address
+    </ResponseField>
+    
+    <ResponseField name="phone" type="string" required>
+      User's phone number
+    </ResponseField>
+    
+    <ResponseField name="birthdate" type="string" required>
+      Date of birth in ISO 8601 format (YYYY-MM-DD)
+    </ResponseField>
+    
+    <ResponseField name="gender" type="string" required>
+      User's gender
+    </ResponseField>
+    
+    <ResponseField name="address_line1" type="string" required>
+      Primary address line
+    </ResponseField>
+    
+    <ResponseField name="address_line2" type="string">
+      Secondary address line (optional)
+    </ResponseField>
+    
+    <ResponseField name="city" type="string" required>
+      City of residence
+    </ResponseField>
+    
+    <ResponseField name="state" type="string" required>
+      State or province
+    </ResponseField>
+    
+    <ResponseField name="postal_code" type="string" required>
+      Postal or ZIP code
+    </ResponseField>
+    
+    <ResponseField name="neighborhood" type="string" required>
+      Neighborhood or district
+    </ResponseField>
+    
+    <ResponseField name="country_of_birth_code" type="string" required>
+      ISO country code for country of birth
+    </ResponseField>
+    
+    <ResponseField name="country_of_residence_code" type="string" required>
+      ISO country code for country of residence
+    </ResponseField>
+    
+    <ResponseField name="personal_id_type" type="string" required>
+      Type of personal identification document
+    </ResponseField>
+    
+    <ResponseField name="personal_id_number" type="string" required>
+      Personal identification number
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Example Response
+
+```json
+{
+  "urn": "did:bloque:origin:ethereum-mainnet:0x742d35...",
+  "origin": "ethereum-mainnet",
+  "type": "individual",
+  "status": "active",
+  "profile": {
+    "first_name": "John",
+    "last_name": "Doe",
+    "email": "john.doe@example.com",
+    "phone": "+1234567890",
+    "birthdate": "1990-01-15",
+    "gender": "male",
+    "address_line1": "123 Main St",
+    "city": "New York",
+    "state": "NY",
+    "postal_code": "10001",
+    "neighborhood": "Manhattan",
+    "country_of_birth_code": "USA",
+    "country_of_residence_code": "USA",
+    "personal_id_type": "SSN",
+    "personal_id_number": "***-**-6789"
+  },
+  "metadata": {}
+}
+```

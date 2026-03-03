@@ -1,0 +1,446 @@
+---
+title: 'Virtual & Physical Cards'
+description: 'Create and manage virtual and physical debit/credit cards with CardClient'
+---
+
+## Overview
+
+The CardClient provides methods for creating and managing virtual and physical cards. Cards are linked to ledger accounts and can be used for spending with support for multiple assets.
+
+## Accessing CardClient
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  auth: {
+    type: 'apiKey',
+    apiKey: process.env.BLOQUE_API_KEY,
+  },
+});
+
+const user = await bloque.connect('@username');
+const cardClient = user.accounts.card;
+```
+
+## Creating Cards
+
+### Basic Card Creation
+
+```typescript
+const card = await user.accounts.card.create({
+  name: 'My Card',
+});
+
+console.log(card.urn);
+console.log(card.lastFour);
+console.log(card.status); // 'creation_in_progress'
+```
+
+### Wait for Active Status
+
+Use the `waitLedger` option to wait for the card to become active:
+
+```typescript
+const card = await user.accounts.card.create(
+  {
+    name: 'My Card',
+  },
+  { waitLedger: true }
+);
+
+console.log(card.status); // 'active'
+```
+
+### Link to Existing Ledger Account
+
+Cards can share a ledger account with other accounts (like virtual accounts or Polygon wallets):
+
+```typescript
+// Create a virtual account first
+const virtual = await user.accounts.virtual.create({}, { waitLedger: true });
+
+// Create a card linked to the same ledger
+const card = await user.accounts.card.create(
+  {
+    ledgerId: virtual.ledgerId,
+    name: 'My Card',
+  },
+  { waitLedger: true }
+);
+
+// Both accounts now share the same balance
+```
+
+<Note>
+Linking multiple accounts to the same ledger creates a "pocket" - a shared balance that multiple payment methods can access.
+</Note>
+
+### Create with Metadata
+
+```typescript
+const card = await user.accounts.card.create({
+  name: 'Business Card',
+  metadata: {
+    preferred_asset: 'DUSD/6',
+    default_asset: 'DUSD/6',
+    department: 'marketing',
+  },
+});
+```
+
+### Create with Webhook
+
+```typescript
+const card = await user.accounts.card.create({
+  name: 'My Card',
+  webhookUrl: 'https://api.example.com/webhooks/card-events',
+});
+```
+
+## Listing Cards
+
+### List All Cards
+
+```typescript
+const { accounts } = await user.accounts.card.list();
+
+accounts.forEach(card => {
+  console.log(card.urn);
+  console.log(card.lastFour);
+  console.log(card.productType); // 'CREDIT' | 'DEBIT'
+  console.log(card.cardType);    // 'VIRTUAL' | 'PHYSICAL'
+  console.log(card.status);
+  console.log(card.balance);
+});
+```
+
+### Get Specific Card
+
+```typescript
+const { accounts } = await user.accounts.card.list({
+  urn: 'did:bloque:account:card:usr-123:crd-456'
+});
+
+const card = accounts[0];
+```
+
+## Card Details
+
+The `CardAccount` type includes:
+
+<ResponseField name="urn" type="string" required>
+  Unique resource name for the card account
+</ResponseField>
+
+<ResponseField name="id" type="string" required>
+  Card account ID
+</ResponseField>
+
+<ResponseField name="lastFour" type="string" required>
+  Last four digits of the card
+</ResponseField>
+
+<ResponseField name="productType" type="'CREDIT' | 'DEBIT'" required>
+  Type of card product
+</ResponseField>
+
+<ResponseField name="cardType" type="'VIRTUAL' | 'PHYSICAL'" required>
+  Whether the card is virtual or physical
+</ResponseField>
+
+<ResponseField name="status" type="AccountStatus" required>
+  Current status: `creation_in_progress`, `active`, `disabled`, `frozen`, `deleted`, or `creation_failed`
+</ResponseField>
+
+<ResponseField name="detailsUrl" type="string" required>
+  PCI-compliant URL to view full card details (number, CVV, expiration)
+</ResponseField>
+
+<ResponseField name="ownerUrn" type="string" required>
+  URN of the card owner
+</ResponseField>
+
+<ResponseField name="ledgerId" type="string" required>
+  Ledger account ID associated with the card
+</ResponseField>
+
+<ResponseField name="webhookUrl" type="string | null">
+  Webhook URL for card events (if configured)
+</ResponseField>
+
+<ResponseField name="metadata" type="Record<string, unknown>">
+  Custom metadata attached to the card
+</ResponseField>
+
+<ResponseField name="balance" type="Record<string, TokenBalance>">
+  Token balances by asset (only included in list responses)
+</ResponseField>
+
+## Card Operations
+
+### Get Card Balance
+
+```typescript
+const balance = await user.accounts.card.balance({
+  urn: 'did:bloque:account:card:usr-123:crd-456',
+});
+
+Object.entries(balance).forEach(([asset, b]) => {
+  console.log(`${asset}:`);
+  console.log(`  Current: ${b.current}`);
+  console.log(`  Pending: ${b.pending}`);
+  console.log(`  In: ${b.in}`);
+  console.log(`  Out: ${b.out}`);
+});
+```
+
+### List Card Movements
+
+```typescript
+const { data, pageSize, hasMore, next } = await user.accounts.card.movements({
+  urn: 'did:bloque:account:card:usr-123:crd-456',
+  asset: 'DUSD/6',
+  limit: 50,
+});
+
+data.forEach(movement => {
+  console.log(movement.type);      // 'deposit' | 'withdraw' | 'transfer'
+  console.log(movement.amount);
+  console.log(movement.direction); // 'in' | 'out'
+  console.log(movement.status);
+  console.log(movement.createdAt);
+});
+
+// Fetch next page
+if (hasMore && next) {
+  const nextPage = await user.accounts.card.movements({
+    urn: 'did:bloque:account:card:usr-123:crd-456',
+    asset: 'DUSD/6',
+    next,
+  });
+}
+```
+
+### Filter Movements
+
+```typescript
+// Filter by direction
+const incoming = await user.accounts.card.movements({
+  urn: 'did:bloque:account:card:usr-123:crd-456',
+  asset: 'DUSD/6',
+  direction: 'in',
+});
+
+// Filter by date range
+const recent = await user.accounts.card.movements({
+  urn: 'did:bloque:account:card:usr-123:crd-456',
+  asset: 'DUSD/6',
+  after: '2025-01-01T00:00:00Z',
+  before: '2025-12-31T23:59:59Z',
+});
+
+// Filter by pocket (main = confirmed, pending = pending movements)
+const confirmed = await user.accounts.card.movements({
+  urn: 'did:bloque:account:card:usr-123:crd-456',
+  asset: 'DUSD/6',
+  pocket: 'main',
+});
+
+// Filter by reference
+const specific = await user.accounts.card.movements({
+  urn: 'did:bloque:account:card:usr-123:crd-456',
+  asset: 'DUSD/6',
+  reference: '0xbff43fa587e0efa275f8b643d95881713c0f0ee13682d049cc452f607241b752',
+});
+```
+
+## Managing Cards
+
+### Update Card Metadata
+
+```typescript
+const card = await user.accounts.card.updateMetadata({
+  urn: 'did:bloque:mediums:card:account:123',
+  metadata: {
+    updated_by: 'admin',
+    update_reason: 'customer_request',
+  },
+});
+```
+
+<Warning>
+The `name` and `source` fields are reserved and cannot be modified through `updateMetadata`. Use `updateName` to change the card name.
+</Warning>
+
+### Update Card Name
+
+```typescript
+const card = await user.accounts.card.updateName(
+  'did:bloque:mediums:card:account:123',
+  'My Business Card'
+);
+```
+
+### Activate Card
+
+```typescript
+const card = await user.accounts.card.activate(
+  'did:bloque:mediums:card:account:123'
+);
+
+console.log(card.status); // 'active'
+```
+
+### Freeze Card
+
+```typescript
+const card = await user.accounts.card.freeze(
+  'did:bloque:mediums:card:account:123'
+);
+
+console.log(card.status); // 'frozen'
+```
+
+### Disable Card
+
+```typescript
+const card = await user.accounts.card.disable(
+  'did:bloque:mediums:card:account:123'
+);
+
+console.log(card.status); // 'disabled'
+```
+
+## API Reference
+
+### create()
+
+Create a new card account.
+
+<ParamField path="params" type="CreateCardParams">
+  <ParamField path="name" type="string">
+    Display name for the card
+  </ParamField>
+  <ParamField path="webhookUrl" type="string">
+    Webhook URL to receive card events
+  </ParamField>
+  <ParamField path="ledgerId" type="string">
+    Ledger account ID to associate with the card
+  </ParamField>
+  <ParamField path="metadata" type="Record<string, unknown>">
+    Custom metadata to associate with the card
+  </ParamField>
+</ParamField>
+
+<ParamField path="options" type="CreateAccountOptions">
+  <ParamField path="waitLedger" type="boolean" default={false}>
+    If true, wait for the account to become active before returning
+  </ParamField>
+  <ParamField path="timeout" type="number" default={60000}>
+    Maximum time to wait in milliseconds (only applies when waitLedger is true)
+  </ParamField>
+</ParamField>
+
+### list()
+
+List card accounts.
+
+<ParamField path="params" type="ListCardAccountsParams">
+  <ParamField path="urn" type="string">
+    URN of a specific card account to retrieve
+  </ParamField>
+</ParamField>
+
+### movements()
+
+List card account movements/transactions.
+
+<ParamField path="params" type="ListMovementsParams" required>
+  <ParamField path="urn" type="string" required>
+    URN of the card account
+  </ParamField>
+  <ParamField path="asset" type="SupportedAsset" default="DUSD/6">
+    Asset to filter transactions by
+  </ParamField>
+  <ParamField path="limit" type="number">
+    Maximum number of transactions to return
+  </ParamField>
+  <ParamField path="before" type="string">
+    Filter transactions before this date (ISO 8601)
+  </ParamField>
+  <ParamField path="after" type="string">
+    Filter transactions after this date (ISO 8601)
+  </ParamField>
+  <ParamField path="reference" type="string">
+    Filter by transaction reference
+  </ParamField>
+  <ParamField path="direction" type="'in' | 'out'">
+    Filter by transaction direction
+  </ParamField>
+  <ParamField path="pocket" type="'main' | 'pending'">
+    Filter by pocket: 'main' for confirmed, 'pending' for pending movements
+  </ParamField>
+  <ParamField path="next" type="string">
+    Pagination token for fetching the next page
+  </ParamField>
+</ParamField>
+
+### balance()
+
+Get card account balance.
+
+<ParamField path="params" type="GetBalanceParams" required>
+  <ParamField path="urn" type="string" required>
+    URN of the card account
+  </ParamField>
+</ParamField>
+
+### updateMetadata()
+
+Update card account metadata.
+
+<ParamField path="params" type="UpdateCardMetadataParams" required>
+  <ParamField path="urn" type="string" required>
+    URN of the card account to update
+  </ParamField>
+  <ParamField path="metadata" type="Record<string, unknown>" required>
+    Metadata to update (name and source are reserved)
+  </ParamField>
+</ParamField>
+
+### updateName()
+
+Update card account name.
+
+<ParamField path="urn" type="string" required>
+  Card account URN
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  New name for the card
+</ParamField>
+
+### activate()
+
+Activate a card account.
+
+<ParamField path="urn" type="string" required>
+  Card account URN
+</ParamField>
+
+### freeze()
+
+Freeze a card account.
+
+<ParamField path="urn" type="string" required>
+  Card account URN
+</ParamField>
+
+### disable()
+
+Disable a card account.
+
+<ParamField path="urn" type="string" required>
+  Card account URN
+</ParamField>

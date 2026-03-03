@@ -1,0 +1,327 @@
+---
+title: 'OrgsClient'
+description: 'Client for creating and managing organizations'
+---
+
+## Overview
+
+The `OrgsClient` manages organizational entities within the Bloque platform. Organizations can represent businesses or individual entities with full profile information and compliance status.
+
+```typescript
+import { BloqueSDK } from '@bloque/sdk';
+
+const bloque = await BloqueSDK.connect({
+  apiKey: 'your-api-key',
+  platform: 'node'
+});
+
+const orgs = bloque.orgs;
+```
+
+## Methods
+
+### create()
+
+Create a new organization with complete profile information. Organizations go through a compliance verification process before becoming fully active.
+
+```typescript
+const org = await bloque.orgs.create({
+  org_type: 'business',
+  profile: {
+    legal_name: 'Acme Corporation',
+    tax_id: '12-3456789',
+    incorporation_date: '2020-01-15',
+    business_type: 'LLC',
+    incorporation_country_code: 'US',
+    incorporation_state: 'DE',
+    address_line1: '123 Business St',
+    postal_code: '10001',
+    city: 'New York'
+  },
+  metadata: {
+    industry: 'Technology',
+    employee_count: 50
+  }
+});
+
+console.log(org.urn); // Organization URN
+console.log(org.status); // "awaiting_compliance_verification"
+```
+
+#### Parameters
+
+<ParamField path="org_type" type="'business' | 'individual'" required>
+  Type of organization being created
+  
+  - `"business"` - Corporate entity or business
+  - `"individual"` - Individual person operating as an organization
+</ParamField>
+
+<ParamField path="profile" type="object" required>
+  Organization profile information
+  
+  <Expandable title="Profile Fields">
+    <ParamField path="legal_name" type="string" required>
+      Official registered legal name of the organization
+    </ParamField>
+    
+    <ParamField path="tax_id" type="string" required>
+      Tax identification number (EIN, VAT, RFC, etc.)
+    </ParamField>
+    
+    <ParamField path="incorporation_date" type="string" required>
+      Date of incorporation or registration
+      
+      Format: `YYYY-MM-DD`
+      
+      Example: `"2020-01-15"`
+    </ParamField>
+    
+    <ParamField path="business_type" type="string" required>
+      Business legal structure type
+      
+      Examples: `"LLC"`, `"Corporation"`, `"Partnership"`, `"Sole Proprietorship"`
+    </ParamField>
+    
+    <ParamField path="incorporation_country_code" type="string" required>
+      ISO country code where the organization is incorporated
+      
+      Examples: `"US"`, `"GB"`, `"CA"`
+    </ParamField>
+    
+    <ParamField path="incorporation_state" type="string">
+      State or province of incorporation
+      
+      Example: `"DE"` (Delaware), `"CA"` (California)
+    </ParamField>
+    
+    <ParamField path="address_line1" type="string" required>
+      Primary business address (street address)
+    </ParamField>
+    
+    <ParamField path="address_line2" type="string">
+      Secondary address line (suite, floor, etc.)
+    </ParamField>
+    
+    <ParamField path="postal_code" type="string" required>
+      Postal or ZIP code
+    </ParamField>
+    
+    <ParamField path="city" type="string" required>
+      City where organization is registered
+    </ParamField>
+    
+    <ParamField path="logo_url" type="string">
+      URL to organization's logo image
+      
+      Example: `"https://example.com/logo.png"`
+    </ParamField>
+    
+    <ParamField path="places" type="array">
+      Additional business locations or offices
+      
+      <Expandable title="Place Object">
+        <ParamField path="country_code" type="string" required>
+          ISO country code for the location
+        </ParamField>
+        
+        <ParamField path="state" type="string" required>
+          State or province
+        </ParamField>
+        
+        <ParamField path="address_line1" type="string" required>
+          Primary address
+        </ParamField>
+        
+        <ParamField path="postal_code" type="string" required>
+          Postal code
+        </ParamField>
+        
+        <ParamField path="city" type="string" required>
+          City name
+        </ParamField>
+        
+        <ParamField path="is_primary" type="boolean" required>
+          Whether this is the primary business location
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="metadata" type="Record<string, unknown>">
+  Additional custom metadata for the organization
+  
+  You can store any additional information relevant to your application.
+  
+  Example:
+  ```json
+  {
+    "industry": "Technology",
+    "employee_count": 50,
+    "website": "https://example.com"
+  }
+  ```
+</ParamField>
+
+#### Returns
+
+<ResponseField name="urn" type="string" required>
+  Unique resource name (URN) identifying the organization
+  
+  Example: `"urn:bloque:org:abc123"`
+</ResponseField>
+
+<ResponseField name="org_type" type="'business' | 'individual'" required>
+  Type of organization
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Current status of the organization
+  
+  Possible values:
+  - `"awaiting_compliance_verification"` - Pending compliance review
+  - `"active"` - Fully verified and operational
+  - `"suspended"` - Temporarily suspended
+  - `"closed"` - Permanently closed
+</ResponseField>
+
+<ResponseField name="profile" type="object" required>
+  Complete organization profile (matches input structure)
+</ResponseField>
+
+<ResponseField name="metadata" type="Record<string, unknown>">
+  Custom metadata associated with the organization
+</ResponseField>
+
+#### Example Response
+
+```json
+{
+  "urn": "urn:bloque:org:abc123def456",
+  "org_type": "business",
+  "status": "awaiting_compliance_verification",
+  "profile": {
+    "legal_name": "Acme Corporation",
+    "tax_id": "12-3456789",
+    "incorporation_date": "2020-01-15",
+    "business_type": "LLC",
+    "incorporation_country_code": "US",
+    "incorporation_state": "DE",
+    "address_line1": "123 Business St",
+    "address_line2": "Suite 100",
+    "postal_code": "10001",
+    "city": "New York",
+    "logo_url": "https://example.com/logo.png",
+    "places": [
+      {
+        "country_code": "US",
+        "state": "CA",
+        "address_line1": "456 Tech Ave",
+        "postal_code": "94105",
+        "city": "San Francisco",
+        "is_primary": false
+      }
+    ]
+  },
+  "metadata": {
+    "industry": "Technology",
+    "employee_count": 50
+  }
+}
+```
+
+## Complete Organization Setup
+
+### 1. Create Organization
+
+```typescript
+const organization = await bloque.orgs.create({
+  org_type: 'business',
+  profile: {
+    legal_name: 'TechCorp Inc.',
+    tax_id: '98-7654321',
+    incorporation_date: '2021-03-01',
+    business_type: 'Corporation',
+    incorporation_country_code: 'US',
+    incorporation_state: 'CA',
+    address_line1: '789 Innovation Dr',
+    address_line2: 'Building 2',
+    postal_code: '94025',
+    city: 'Menlo Park',
+    logo_url: 'https://techcorp.example/logo.png',
+    places: [
+      {
+        country_code: 'US',
+        state: 'TX',
+        address_line1: '321 Austin St',
+        postal_code: '78701',
+        city: 'Austin',
+        is_primary: false
+      }
+    ]
+  },
+  metadata: {
+    industry: 'Software',
+    founded_year: 2021,
+    website: 'https://techcorp.example'
+  }
+});
+
+console.log(`Organization created: ${organization.urn}`);
+console.log(`Status: ${organization.status}`);
+```
+
+### 2. Individual Organization
+
+```typescript
+const individualOrg = await bloque.orgs.create({
+  org_type: 'individual',
+  profile: {
+    legal_name: 'Jane Smith',
+    tax_id: '123-45-6789',
+    incorporation_date: '2023-01-01',
+    business_type: 'Sole Proprietorship',
+    incorporation_country_code: 'US',
+    address_line1: '123 Main St',
+    postal_code: '10001',
+    city: 'New York'
+  }
+});
+```
+
+## Error Handling
+
+```typescript
+try {
+  const org = await bloque.orgs.create({
+    org_type: 'business',
+    profile: {
+      legal_name: 'My Company',
+      tax_id: '12-3456789',
+      incorporation_date: '2020-01-15',
+      business_type: 'LLC',
+      incorporation_country_code: 'US',
+      address_line1: '123 Business St',
+      postal_code: '10001',
+      city: 'New York'
+    }
+  });
+} catch (error) {
+  if (error instanceof BloqueValidationError) {
+    console.error('Invalid organization data:', error.message);
+  } else if (error instanceof BloqueAuthenticationError) {
+    console.error('Authentication failed');
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+## Organization Lifecycle
+
+1. **Created**: Organization is created with `awaiting_compliance_verification` status
+2. **Compliance Review**: Bloque reviews the organization information
+3. **Active**: Once approved, status changes to `active` and full features are enabled
+4. **Suspended**: May be temporarily suspended for compliance issues
+5. **Closed**: Permanently closed organizations cannot be reactivated

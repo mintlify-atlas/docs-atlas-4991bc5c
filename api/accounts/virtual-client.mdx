@@ -1,0 +1,303 @@
+---
+title: VirtualClient
+description: API reference for VirtualClient methods
+---
+
+The `VirtualClient` provides methods to manage virtual accounts.
+
+## create()
+
+Create a new virtual account.
+
+```typescript
+await bloque.accounts.virtual.create(
+  params: CreateVirtualAccountParams,
+  options?: CreateAccountOptions
+): Promise<VirtualAccount>
+```
+
+### Parameters
+
+<ParamField path="params" type="CreateVirtualAccountParams">
+  Virtual account creation parameters
+  
+  <Expandable title="properties">
+    <ParamField path="name" type="string" optional>
+      Display name for the virtual account
+    </ParamField>
+    
+    <ParamField path="ledgerId" type="string" optional>
+      Ledger account ID to associate with the virtual account. If not provided, a new ledger account will be created automatically.
+    </ParamField>
+    
+    <ParamField path="webhookUrl" type="string" optional>
+      Webhook URL to receive account events
+    </ParamField>
+    
+    <ParamField path="metadata" type="Record<string, string>" optional>
+      Custom metadata to attach to the virtual account (all values must be strings)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="options" type="CreateAccountOptions" optional>
+  Creation options
+  
+  <Expandable title="properties">
+    <ParamField path="waitLedger" type="boolean" optional>
+      Wait for account to become active before returning
+    </ParamField>
+    
+    <ParamField path="timeout" type="number" optional>
+      Timeout in milliseconds (default: 60000)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="VirtualAccount" type="object">
+  <Expandable title="properties">
+    <ResponseField name="urn" type="string">
+      Unique resource name for the virtual account
+    </ResponseField>
+    
+    <ResponseField name="id" type="string">
+      Account ID
+    </ResponseField>
+    
+    <ResponseField name="firstName" type="string">
+      Account holder's first name
+    </ResponseField>
+    
+    <ResponseField name="lastName" type="string">
+      Account holder's last name
+    </ResponseField>
+    
+    <ResponseField name="status" type="'creation_in_progress' | 'active' | 'disabled' | 'frozen' | 'deleted' | 'creation_failed'">
+      Account status
+    </ResponseField>
+    
+    <ResponseField name="ownerUrn" type="string">
+      Owner URN
+    </ResponseField>
+    
+    <ResponseField name="ledgerId" type="string">
+      Ledger account ID associated with the virtual account
+    </ResponseField>
+    
+    <ResponseField name="webhookUrl" type="string | null">
+      Webhook URL (if configured)
+    </ResponseField>
+    
+    <ResponseField name="metadata" type="Record<string, string>" optional>
+      Custom metadata
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      Creation timestamp
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      Last update timestamp
+    </ResponseField>
+    
+    <ResponseField name="balance" type="object" optional>
+      Token balances (optional, included in list responses and after creation)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```typescript
+// Create without waiting
+const account = await bloque.accounts.virtual.create({
+  firstName: 'John',
+  lastName: 'Doe'
+});
+
+// Create and wait for active status
+const account = await bloque.accounts.virtual.create({
+  firstName: 'John',
+  lastName: 'Doe'
+}, { waitLedger: true });
+```
+
+## list()
+
+List virtual accounts.
+
+```typescript
+await bloque.accounts.virtual.list(
+  params?: ListVirtualAccountsParams
+): Promise<ListVirtualAccountsResult>
+```
+
+### Parameters
+
+<ParamField path="params" type="ListVirtualAccountsParams" optional>
+  List parameters
+  
+  <Expandable title="properties">
+    <ParamField path="urn" type="string" optional>
+      URN of a specific virtual account to retrieve
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="ListVirtualAccountsResult" type="object">
+  <Expandable title="properties">
+    <ResponseField name="accounts" type="VirtualAccount[]">
+      Array of virtual accounts with balance information
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```typescript
+// List all virtual accounts
+const result = await bloque.accounts.virtual.list();
+
+// Get a specific virtual account
+const result = await bloque.accounts.virtual.list({
+  urn: 'did:bloque:account:virtual:275d10a2-0854-4081-9d61-ea506e917335'
+});
+```
+
+## updateMetadata()
+
+Update virtual account metadata.
+
+```typescript
+await bloque.accounts.virtual.updateMetadata(
+  params: UpdateVirtualMetadataParams
+): Promise<VirtualAccount>
+```
+
+### Parameters
+
+<ParamField path="params" type="UpdateVirtualMetadataParams">
+  Metadata update parameters
+  
+  <Expandable title="properties">
+    <ParamField path="urn" type="string" required>
+      URN of the virtual account to update
+    </ParamField>
+    
+    <ParamField path="metadata" type="Record<string, string>" required>
+      Metadata to update (source is a reserved field and cannot be modified)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="VirtualAccount" type="object">
+  Updated virtual account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.virtual.updateMetadata({
+  urn: 'did:bloque:mediums:virtual:account:123',
+  metadata: {
+    updated_by: 'admin',
+    update_reason: 'testing_update'
+  }
+});
+```
+
+## activate()
+
+Activate a virtual account.
+
+```typescript
+await bloque.accounts.virtual.activate(
+  urn: string
+): Promise<VirtualAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  Virtual account URN
+</ParamField>
+
+### Returns
+
+<ResponseField name="VirtualAccount" type="object">
+  Updated virtual account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.virtual.activate(
+  'did:bloque:mediums:virtual:account:123'
+);
+```
+
+## freeze()
+
+Freeze a virtual account.
+
+```typescript
+await bloque.accounts.virtual.freeze(
+  urn: string
+): Promise<VirtualAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  Virtual account URN
+</ParamField>
+
+### Returns
+
+<ResponseField name="VirtualAccount" type="object">
+  Updated virtual account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.virtual.freeze(
+  'did:bloque:mediums:virtual:account:123'
+);
+```
+
+## disable()
+
+Disable a virtual account.
+
+```typescript
+await bloque.accounts.virtual.disable(
+  urn: string
+): Promise<VirtualAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  Virtual account URN
+</ParamField>
+
+### Returns
+
+<ResponseField name="VirtualAccount" type="object">
+  Updated virtual account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.virtual.disable(
+  'did:bloque:mediums:virtual:account:123'
+);
+```

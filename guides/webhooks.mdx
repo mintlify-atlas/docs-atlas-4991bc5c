@@ -1,0 +1,390 @@
+---
+title: Webhooks
+description: Receive real-time notifications for account and transaction events
+---
+
+## Overview
+
+Webhooks allow you to receive real-time HTTP notifications when events occur in your Bloque accounts. Instead of polling for updates, Bloque pushes event data to your configured endpoint.
+
+**Common use cases:**
+- Get notified when transfers complete
+- Track batch transfer settlement
+- Monitor account balance changes
+- Receive card transaction notifications
+- Track account status changes
+
+## Setting Up Webhooks
+
+You can configure webhooks at two levels:
+
+1. **Account-level webhooks** - Receive events for a specific account
+2. **Operation-level webhooks** - Receive notifications for specific operations (like batch transfers)
+
+### Account-Level Webhooks
+
+Configure a webhook URL when creating an account:
+
+<CodeGroup>
+```typescript Card Account
+const card = await user.accounts.card.create({
+  name: 'My Card',
+  ledgerId: pocket.ledgerId,
+  webhookUrl: 'https://api.example.com/webhooks/card',
+  metadata: {
+    spending_control: 'default',
+  },
+});
+```
+
+```typescript Virtual Account
+const pocket = await user.accounts.virtual.create({
+  name: 'Savings Pocket',
+  webhookUrl: 'https://api.example.com/webhooks/virtual',
+});
+```
+
+```typescript Polygon Account
+const wallet = await user.accounts.polygon.create({
+  address: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+  webhookUrl: 'https://api.example.com/webhooks/polygon',
+});
+```
+</CodeGroup>
+
+### Operation-Level Webhooks
+
+Receive notifications when specific operations complete:
+
+```typescript
+// Batch transfer with webhook
+const result = await user.accounts.batchTransfer({
+  reference: 'payroll-2025-02',
+  operations: [
+    {
+      fromUrn: treasury.urn,
+      toUrn: alice.urn,
+      reference: 'salary-alice-feb',
+      amount: '3000000000',
+      asset: 'DUSD/6',
+    },
+  ],
+  metadata: {
+    department: 'engineering',
+  },
+  webhookUrl: 'https://api.example.com/webhooks/batch-settlement',
+});
+```
+
+## Webhook Endpoint Requirements
+
+Your webhook endpoint must:
+
+<Steps>
+  <Step title="Use HTTPS">
+    Production webhooks require HTTPS. HTTP is only allowed in sandbox mode.
+  </Step>
+  <Step title="Respond quickly">
+    Return a `200 OK` response within 5 seconds to acknowledge receipt.
+  </Step>
+  <Step title="Handle retries">
+    Implement idempotency to safely handle duplicate events.
+  </Step>
+  <Step title="Validate signatures">
+    Verify webhook signatures to ensure requests are from Bloque (recommended).
+  </Step>
+</Steps>
+
+## Webhook Payload
+
+Webhook events are delivered as HTTP POST requests with a JSON payload:
+
+```json
+{
+  "event": "transfer.completed",
+  "timestamp": "2025-02-15T14:30:00Z",
+  "data": {
+    "queueId": "queue_abc123",
+    "sourceUrn": "did:bloque:account:virtual:acc-12345",
+    "destinationUrn": "did:bloque:account:card:usr-123:crd-456",
+    "amount": "50000000",
+    "asset": "DUSD/6",
+    "status": "completed",
+    "metadata": {
+      "note": "Weekly allowance"
+    }
+  }
+}
+```
+
+## Event Types
+
+<AccordionGroup>
+  <Accordion title="Transfer Events">
+    - `transfer.queued` - Transfer has been queued
+    - `transfer.processing` - Transfer is being processed
+    - `transfer.completed` - Transfer completed successfully
+    - `transfer.failed` - Transfer failed
+  </Accordion>
+
+  <Accordion title="Batch Transfer Events">
+    - `batch.queued` - Batch transfer queued
+    - `batch.processing` - Batch is being processed
+    - `batch.completed` - All operations completed
+    - `batch.partial_failure` - Some operations failed
+    - `batch.failed` - Batch failed completely
+  </Accordion>
+
+  <Accordion title="Account Events">
+    - `account.created` - Account created
+    - `account.activated` - Account became active
+    - `account.frozen` - Account was frozen
+    - `account.disabled` - Account was disabled
+    - `account.balance_changed` - Balance was updated
+  </Accordion>
+
+  <Accordion title="Card Transaction Events">
+    - `card.transaction.authorized` - Transaction authorized
+    - `card.transaction.settled` - Transaction settled
+    - `card.transaction.declined` - Transaction declined
+    - `card.transaction.reversed` - Transaction reversed/refunded
+  </Accordion>
+</AccordionGroup>
+
+## Implementing a Webhook Handler
+
+Here's an example webhook handler using Express:
+
+<CodeGroup>
+```typescript Express
+import express from 'express';
+import crypto from 'crypto';
+
+const app = express();
+
+app.post('/webhooks/bloque', express.json(), async (req, res) => {
+  const signature = req.headers['x-bloque-signature'];
+  const payload = JSON.stringify(req.body);
+
+  // Verify signature (recommended)
+  if (!verifySignature(payload, signature)) {
+    return res.status(401).send('Invalid signature');
+  }
+
+  const { event, data } = req.body;
+
+  // Handle different event types
+  switch (event) {
+    case 'transfer.completed':
+      await handleTransferCompleted(data);
+      break;
+    case 'transfer.failed':
+      await handleTransferFailed(data);
+      break;
+    case 'card.transaction.settled':
+      await handleCardTransaction(data);
+      break;
+    default:
+      console.log('Unhandled event type:', event);
+  }
+
+  // Acknowledge receipt
+  res.status(200).send('OK');
+});
+
+function verifySignature(payload: string, signature: string): boolean {
+  const webhookSecret = process.env.BLOQUE_WEBHOOK_SECRET!;
+  const hmac = crypto.createHmac('sha256', webhookSecret);
+  const digest = hmac.update(payload).digest('hex');
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(digest)
+  );
+}
+
+async function handleTransferCompleted(data: any) {
+  console.log('Transfer completed:', data.queueId);
+  // Update your database, send notifications, etc.
+}
+
+app.listen(3000);
+```
+
+```typescript Next.js
+// app/api/webhooks/bloque/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
+
+export async function POST(request: NextRequest) {
+  const signature = request.headers.get('x-bloque-signature');
+  const body = await request.json();
+  const payload = JSON.stringify(body);
+
+  // Verify signature
+  if (!verifySignature(payload, signature)) {
+    return NextResponse.json(
+      { error: 'Invalid signature' },
+      { status: 401 }
+    );
+  }
+
+  const { event, data } = body;
+
+  // Handle events
+  switch (event) {
+    case 'transfer.completed':
+      await handleTransferCompleted(data);
+      break;
+    case 'batch.completed':
+      await handleBatchCompleted(data);
+      break;
+  }
+
+  return NextResponse.json({ received: true });
+}
+
+function verifySignature(payload: string, signature: string | null): boolean {
+  if (!signature) return false;
+  const webhookSecret = process.env.BLOQUE_WEBHOOK_SECRET!;
+  const hmac = crypto.createHmac('sha256', webhookSecret);
+  const digest = hmac.update(payload).digest('hex');
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(digest)
+  );
+}
+```
+</CodeGroup>
+
+## Signature Verification
+
+Bloque signs webhook payloads with HMAC-SHA256 to ensure authenticity:
+
+<Steps>
+  <Step title="Get your webhook secret">
+    Your webhook secret is provided when you set up webhooks in the dashboard.
+  </Step>
+  <Step title="Extract the signature">
+    The signature is sent in the `x-bloque-signature` header.
+  </Step>
+  <Step title="Compute HMAC">
+    Create an HMAC-SHA256 hash of the raw request body using your webhook secret.
+  </Step>
+  <Step title="Compare signatures">
+    Use timing-safe comparison to verify the computed hash matches the header.
+  </Step>
+</Steps>
+
+<Warning>
+Always verify webhook signatures in production to prevent unauthorized requests from malicious actors.
+</Warning>
+
+## Retry Logic
+
+Bloque automatically retries failed webhook deliveries:
+
+- **Retry schedule**: 1 min, 5 min, 30 min, 2 hours, 6 hours
+- **Maximum retries**: 5 attempts
+- **Success criteria**: HTTP 2xx response within 5 seconds
+
+<Tip>
+Implement idempotency by tracking processed event IDs to safely handle duplicate webhooks.
+</Tip>
+
+## Testing Webhooks Locally
+
+Use tools like ngrok to test webhooks during development:
+
+```bash
+# Install ngrok
+npm install -g ngrok
+
+# Expose your local server
+ngrok http 3000
+
+# Use the ngrok URL as your webhook endpoint
+https://abc123.ngrok.io/webhooks/bloque
+```
+
+## Idempotency Pattern
+
+Track processed events to handle duplicates:
+
+```typescript
+import { db } from './database';
+
+async function handleWebhook(event: WebhookEvent) {
+  const eventId = event.data.queueId;
+
+  // Check if already processed
+  const existing = await db.webhookEvents.findUnique({
+    where: { eventId },
+  });
+
+  if (existing) {
+    console.log('Event already processed:', eventId);
+    return; // Skip duplicate
+  }
+
+  // Process event
+  await processEvent(event);
+
+  // Mark as processed
+  await db.webhookEvents.create({
+    data: {
+      eventId,
+      eventType: event.event,
+      processedAt: new Date(),
+    },
+  });
+}
+```
+
+## Webhook Debugging
+
+Common issues and solutions:
+
+<AccordionGroup>
+  <Accordion title="Not receiving webhooks">
+    - Verify your endpoint is publicly accessible
+    - Check that you're using HTTPS in production
+    - Ensure your server responds within 5 seconds
+    - Check firewall rules and rate limiting
+  </Accordion>
+
+  <Accordion title="Signature verification fails">
+    - Use the raw request body (before parsing JSON)
+    - Ensure you're using the correct webhook secret
+    - Check for encoding issues in the signature comparison
+  </Accordion>
+
+  <Accordion title="Missing events">
+    - Check webhook URL configuration on the account
+    - Verify the event type you're expecting is actually sent
+    - Look for errors in your webhook handler logs
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Respond immediately" icon="bolt">
+    Return 200 OK as fast as possible. Process events asynchronously in a background job.
+  </Card>
+  <Card title="Verify signatures" icon="shield-check">
+    Always verify webhook signatures in production to ensure authenticity.
+  </Card>
+  <Card title="Implement idempotency" icon="repeat">
+    Track processed event IDs to safely handle duplicate deliveries.
+  </Card>
+  <Card title="Log everything" icon="file-lines">
+    Log webhook payloads and processing results for debugging and auditing.
+  </Card>
+</CardGroup>
+
+## Related
+
+- [Transfers](/guides/transfers) - Transferring funds with webhook notifications
+- [Metadata](/guides/metadata) - Adding context to webhook events
+- [Card Accounts](/accounts/card) - Card transaction webhooks
+- [Error Handling](/concepts/error-handling) - Handling webhook errors

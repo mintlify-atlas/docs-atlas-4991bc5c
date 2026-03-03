@@ -1,0 +1,174 @@
+---
+title: Identity Management
+description: Manage user identities, aliases, and origins in the Bloque platform
+---
+
+## Overview
+
+The Identity module provides a comprehensive system for managing user identities across multiple origins (authentication providers). It supports both individual users (KYC) and business entities (KYB), with features for alias management and multi-origin registration.
+
+## Key Concepts
+
+### Identity URN
+
+Every identity in the Bloque platform is uniquely identified by a URN (Uniform Resource Name) in the format:
+
+```
+did:bloque:origin:{namespace}:{alias}
+```
+
+### Origins
+
+Origins represent authentication providers or entry points for identities. Common origin types include:
+
+- **EVM Blockchains** - Ethereum, Polygon, Base, etc. (using wallet signatures)
+- **OAuth Providers** - Auth0 and other OAuth2 providers
+- **OTP Providers** - WhatsApp, Email
+- **API Keys** - Traditional API key authentication
+
+### Aliases
+
+Aliases are human-readable identifiers associated with an identity. Examples:
+- Email addresses: `user@example.com`
+- Phone numbers: `+1234567890`
+- Blockchain addresses: `0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6`
+
+## Identity Client
+
+The `IdentityClient` provides access to identity management functionality:
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = SDK.connect({
+  apiKey: 'your-api-key',
+  environment: 'sandbox'
+});
+
+// Access identity services
+const identity = bloque.identity;
+```
+
+### Get Current Identity
+
+Retrieve the authenticated user's identity profile:
+
+```typescript
+const me = await bloque.identity.me();
+
+console.log(me.urn);      // Identity URN
+console.log(me.origin);   // Origin namespace
+console.log(me.type);     // 'individual' or 'business'
+console.log(me.status);   // Identity status
+console.log(me.profile);  // Profile information
+```
+
+## Identity Profile Types
+
+### Individual Profile
+
+```typescript identity/src/types.ts
+interface IdentityMeProfile {
+  city: string;
+  email: string;
+  phone: string;
+  state: string;
+  gender: string;
+  birthdate: string;              // ISO 8601 format (YYYY-MM-DD)
+  last_name: string;
+  first_name: string;
+  postal_code: string;
+  neighborhood: string;
+  address_line1: string;
+  address_line2?: string;
+  personal_id_type: string;       // e.g., 'SSN', 'passport'
+  personal_id_number: string;
+  country_of_birth_code: string;  // ISO country code
+  country_of_residence_code: string;
+}
+```
+
+### Identity Response
+
+```typescript identity/src/types.ts
+interface IdentityMe {
+  urn: string;                    // Unique identity URN
+  origin: string;                 // Origin namespace
+  type: string;                   // 'individual' or 'business'
+  profile: IdentityMeProfile;     // Profile data
+  status: string;                 // Identity status
+  metadata: Record<string, unknown>;
+}
+```
+
+## Sub-Modules
+
+The Identity module includes specialized sub-clients:
+
+<CardGroup cols={2}>
+  <Card title="Aliases" icon="fingerprint" href="/identity/aliases">
+    Manage identity aliases and lookups
+  </Card>
+  <Card title="Origins" icon="shield-check" href="/identity/origins">
+    Register identities and manage origins
+  </Card>
+</CardGroup>
+
+## Example: Complete Identity Flow
+
+```typescript
+// 1. List available origins
+const origins = await bloque.identity.origins.list();
+console.log('Available origins:', origins);
+
+// 2. Register a new identity (see Origins documentation)
+const registration = await bloque.identity.origins.register(
+  'ethereum-mainnet',
+  registerParams
+);
+
+// 3. Get identity information
+const me = await bloque.identity.me();
+
+// 4. Look up an alias
+const alias = await bloque.identity.aliases.get('user@example.com');
+```
+
+## Status Values
+
+Identities can have the following statuses:
+
+- `active` - Identity is active and can perform operations
+- `inactive` - Identity is temporarily inactive
+- `awaiting_compliance_verification` - Pending KYC/KYB verification
+- `suspended` - Identity has been suspended
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Appropriate Origins">
+    Choose the origin type that matches your use case:
+    - Blockchain apps: Use EVM or other chain-specific origins
+    - Web apps: Use OAuth or email/WhatsApp OTP
+    - Backend services: Use API key authentication
+  </Accordion>
+
+  <Accordion title="Handle Multiple Aliases">
+    Users may have multiple aliases across different origins. Use the URN as the canonical identifier.
+  </Accordion>
+
+  <Accordion title="Verify Identity Status">
+    Always check the identity status before performing sensitive operations.
+  </Accordion>
+</AccordionGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Compliance" icon="clipboard-check" href="/compliance/kyc">
+    KYC/KYB verification for identities
+  </Card>
+  <Card title="Organizations" icon="building" href="/organizations/overview">
+    Manage business organizations
+  </Card>
+</CardGroup>

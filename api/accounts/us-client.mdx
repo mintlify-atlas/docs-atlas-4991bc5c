@@ -1,0 +1,468 @@
+---
+title: USClient
+description: API reference for USClient methods
+---
+
+The `USClient` provides methods to manage US bank accounts.
+
+## getTosLink()
+
+Get Terms of Service acceptance link.
+
+```typescript
+await bloque.accounts.us.getTosLink(
+  params: GetTosLinkParams
+): Promise<TosLinkResult>
+```
+
+### Parameters
+
+<ParamField path="params" type="GetTosLinkParams">
+  TOS link parameters
+  
+  <Expandable title="properties">
+    <ParamField path="redirectUri" type="string" required>
+      Redirect URI after user accepts terms of service
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="TosLinkResult" type="object">
+  <Expandable title="properties">
+    <ResponseField name="url" type="string">
+      URL to redirect user to accept terms of service
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```typescript
+const tosLink = await bloque.accounts.us.getTosLink({
+  redirectUri: 'https://myapp.com/callback'
+});
+
+// Redirect user to tosLink.url
+// After acceptance, extract signed_agreement_id from callback
+```
+
+## create()
+
+Create a new US bank account.
+
+```typescript
+await bloque.accounts.us.create(
+  params: CreateUsAccountParams,
+  options?: CreateAccountOptions
+): Promise<UsAccount>
+```
+
+### Parameters
+
+<ParamField path="params" type="CreateUsAccountParams">
+  US account creation parameters
+  
+  <Expandable title="properties">
+    <ParamField path="type" type="'individual' | 'business'" required>
+      Account type
+    </ParamField>
+    
+    <ParamField path="firstName" type="string" required>
+      First name
+    </ParamField>
+    
+    <ParamField path="middleName" type="string" optional>
+      Middle name
+    </ParamField>
+    
+    <ParamField path="lastName" type="string" required>
+      Last name
+    </ParamField>
+    
+    <ParamField path="email" type="string" required>
+      Email address
+    </ParamField>
+    
+    <ParamField path="phone" type="string" required>
+      Phone number with country code
+    </ParamField>
+    
+    <ParamField path="address" type="UsAccountAddress" required>
+      Address information
+      
+      <Expandable title="properties">
+        <ParamField path="streetLine1" type="string" required>
+          Street address line 1
+        </ParamField>
+        
+        <ParamField path="streetLine2" type="string" optional>
+          Street address line 2
+        </ParamField>
+        
+        <ParamField path="city" type="string" required>
+          City
+        </ParamField>
+        
+        <ParamField path="state" type="string" required>
+          State code (2 letters)
+        </ParamField>
+        
+        <ParamField path="postalCode" type="string" required>
+          Postal code
+        </ParamField>
+        
+        <ParamField path="country" type="string" required>
+          Country code (2 letters)
+        </ParamField>
+      </Expandable>
+    </ParamField>
+    
+    <ParamField path="birthDate" type="string" required>
+      Birth date in YYYY-MM-DD format
+    </ParamField>
+    
+    <ParamField path="taxIdentificationNumber" type="string" required>
+      Tax identification number (SSN for individuals, EIN for businesses)
+    </ParamField>
+    
+    <ParamField path="govIdCountry" type="string" required>
+      Government ID issuing country (2-letter code)
+    </ParamField>
+    
+    <ParamField path="govIdImageFront" type="string" required>
+      Base64-encoded image of government ID front
+    </ParamField>
+    
+    <ParamField path="signedAgreementId" type="string" required>
+      Signed agreement ID obtained from getTosLink
+    </ParamField>
+    
+    <ParamField path="name" type="string" optional>
+      Display name for the US account
+    </ParamField>
+    
+    <ParamField path="webhookUrl" type="string" optional>
+      Webhook URL to receive account events
+    </ParamField>
+    
+    <ParamField path="ledgerId" type="string" optional>
+      Ledger account ID to associate with this account
+    </ParamField>
+    
+    <ParamField path="metadata" type="Record<string, unknown>" optional>
+      Custom metadata to associate with the account
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="options" type="CreateAccountOptions" optional>
+  Creation options
+  
+  <Expandable title="properties">
+    <ParamField path="waitLedger" type="boolean" optional>
+      Wait for account to become active before returning
+    </ParamField>
+    
+    <ParamField path="timeout" type="number" optional>
+      Timeout in milliseconds (default: 60000)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="UsAccount" type="object">
+  <Expandable title="properties">
+    <ResponseField name="urn" type="string">
+      Unique resource name for the US account
+    </ResponseField>
+    
+    <ResponseField name="id" type="string">
+      US account ID
+    </ResponseField>
+    
+    <ResponseField name="type" type="'individual' | 'business'">
+      Account type
+    </ResponseField>
+    
+    <ResponseField name="firstName" type="string">
+      First name
+    </ResponseField>
+    
+    <ResponseField name="middleName" type="string" optional>
+      Middle name (if provided)
+    </ResponseField>
+    
+    <ResponseField name="lastName" type="string">
+      Last name
+    </ResponseField>
+    
+    <ResponseField name="email" type="string">
+      Email address
+    </ResponseField>
+    
+    <ResponseField name="phone" type="string">
+      Phone number
+    </ResponseField>
+    
+    <ResponseField name="address" type="UsAccountAddress">
+      Address information
+    </ResponseField>
+    
+    <ResponseField name="birthDate" type="string">
+      Birth date in YYYY-MM-DD format
+    </ResponseField>
+    
+    <ResponseField name="accountNumber" type="string" optional>
+      Bank account number (if available)
+    </ResponseField>
+    
+    <ResponseField name="routingNumber" type="string" optional>
+      Bank routing number (if available)
+    </ResponseField>
+    
+    <ResponseField name="status" type="'active' | 'disabled' | 'frozen' | 'deleted' | 'creation_in_progress' | 'creation_failed'">
+      Current status of the account
+    </ResponseField>
+    
+    <ResponseField name="ownerUrn" type="string">
+      Owner URN
+    </ResponseField>
+    
+    <ResponseField name="ledgerId" type="string">
+      Ledger account ID associated with this account
+    </ResponseField>
+    
+    <ResponseField name="webhookUrl" type="string | null">
+      Webhook URL (if configured)
+    </ResponseField>
+    
+    <ResponseField name="metadata" type="Record<string, unknown>" optional>
+      Custom metadata
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      Creation timestamp
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      Last update timestamp
+    </ResponseField>
+    
+    <ResponseField name="balance" type="Record<string, TokenBalance>" optional>
+      Token balances (only included in list responses)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```typescript
+// First, get TOS link and have user accept
+const tosLink = await bloque.accounts.us.getTosLink({
+  redirectUri: 'https://myapp.com/callback'
+});
+
+// After user accepts, create account with signed_agreement_id
+const account = await bloque.accounts.us.create({
+  type: 'individual',
+  firstName: 'Robert',
+  middleName: 'James',
+  lastName: 'Johnson',
+  email: 'robert.johnson@example.com',
+  phone: '+12125551234',
+  address: {
+    streetLine1: '456 Wall Street',
+    streetLine2: 'Suite 789',
+    city: 'New York',
+    state: 'NY',
+    postalCode: '10005',
+    country: 'US'
+  },
+  birthDate: '1985-03-15',
+  taxIdentificationNumber: '123-45-6789',
+  govIdCountry: 'US',
+  govIdImageFront: 'base64_encoded_image',
+  signedAgreementId: '0d139f8e-14b0-4540-92ba-4e66c619b533'
+});
+```
+
+## list()
+
+List US bank accounts.
+
+```typescript
+await bloque.accounts.us.list(
+  params?: ListUsAccountsParams
+): Promise<ListUsAccountsResult>
+```
+
+### Parameters
+
+<ParamField path="params" type="ListUsAccountsParams" optional>
+  List parameters
+  
+  <Expandable title="properties">
+    <ParamField path="urn" type="string" optional>
+      URN of a specific US account to retrieve
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="ListUsAccountsResult" type="object">
+  <Expandable title="properties">
+    <ResponseField name="accounts" type="UsAccount[]">
+      Array of US accounts with balance information
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```typescript
+// List all US accounts
+const result = await bloque.accounts.us.list();
+
+// Get a specific US account
+const result = await bloque.accounts.us.list({
+  urn: 'did:bloque:account:us-account:usr-123:us-456'
+});
+```
+
+## updateMetadata()
+
+Update US account metadata.
+
+```typescript
+await bloque.accounts.us.updateMetadata(
+  params: UpdateUsMetadataParams
+): Promise<UsAccount>
+```
+
+### Parameters
+
+<ParamField path="params" type="UpdateUsMetadataParams">
+  Metadata update parameters
+  
+  <Expandable title="properties">
+    <ParamField path="urn" type="string" required>
+      URN of the US account to update
+    </ParamField>
+    
+    <ParamField path="metadata" type="Record<string, unknown>" required>
+      Metadata to update
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Returns
+
+<ResponseField name="UsAccount" type="object">
+  Updated US account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.us.updateMetadata({
+  urn: 'did:bloque:mediums:us-account:account:123',
+  metadata: {
+    updated_by: 'admin',
+    update_reason: 'customer_request'
+  }
+});
+```
+
+## activate()
+
+Activate a US account.
+
+```typescript
+await bloque.accounts.us.activate(
+  urn: string
+): Promise<UsAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  US account URN
+</ParamField>
+
+### Returns
+
+<ResponseField name="UsAccount" type="object">
+  Updated US account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.us.activate(
+  'did:bloque:mediums:us-account:account:123'
+);
+```
+
+## freeze()
+
+Freeze a US account.
+
+```typescript
+await bloque.accounts.us.freeze(
+  urn: string
+): Promise<UsAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  US account URN
+</ParamField>
+
+### Returns
+
+<ResponseField name="UsAccount" type="object">
+  Updated US account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.us.freeze(
+  'did:bloque:mediums:us-account:account:123'
+);
+```
+
+## disable()
+
+Disable a US account.
+
+```typescript
+await bloque.accounts.us.disable(
+  urn: string
+): Promise<UsAccount>
+```
+
+### Parameters
+
+<ParamField path="urn" type="string" required>
+  US account URN
+</ParamField>
+
+### Returns
+
+<ResponseField name="UsAccount" type="object">
+  Updated US account
+</ResponseField>
+
+### Example
+
+```typescript
+const account = await bloque.accounts.us.disable(
+  'did:bloque:mediums:us-account:account:123'
+);
+```

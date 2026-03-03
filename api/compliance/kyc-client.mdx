@@ -1,0 +1,237 @@
+---
+title: 'KycClient'
+description: 'Client for managing Know Your Customer (KYC) verification processes'
+---
+
+## Overview
+
+The `KycClient` handles KYC (Know Your Customer) verification workflows for individuals. It provides methods to initiate verification processes and check verification status.
+
+```typescript
+import { BloqueSDK } from '@bloque/sdk';
+
+const bloque = await BloqueSDK.connect({
+  apiKey: 'your-api-key',
+  platform: 'node'
+});
+
+const kyc = bloque.compliance.kyc;
+```
+
+## Methods
+
+### startVerification()
+
+Initiate a new KYC verification process for a user. This creates a verification session and returns a URL where the user can complete their identity verification.
+
+```typescript
+const verification = await bloque.compliance.kyc.startVerification({
+  urn: 'did:bloque:origin:ethereum-mainnet:0x742d35...',
+  webhookUrl: 'https://api.example.com/webhooks/kyc'
+});
+
+console.log(verification.url); // Send this URL to the user
+console.log(verification.status); // "awaiting_compliance_verification"
+```
+
+#### Parameters
+
+<ParamField path="urn" type="string" required>
+  URN (Uniform Resource Name) that uniquely identifies the user within the system.
+  
+  This value is used to associate the KYC verification process with a specific user.
+  
+  Example: `"did:bloque:origin:ethereum-mainnet:0x742d35..."`
+</ParamField>
+
+<ParamField path="webhookUrl" type="string">
+  URL where webhook notifications will be sent when the verification status changes.
+  
+  This is optional. If provided, the platform will send POST requests to this URL with verification status updates.
+  
+  Example: `"https://api.example.com/webhooks/kyc"`
+</ParamField>
+
+#### Returns
+
+<ResponseField name="url" type="string" required>
+  URL where the user can complete the KYC verification process.
+  
+  Direct the user to this URL to complete identity verification. The URL typically links to a third-party KYC provider interface.
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Current status of the verification
+  
+  Possible values:
+  - `"awaiting_compliance_verification"` - Verification initiated, waiting for user to complete
+  - `"approved"` - Verification completed and approved
+  - `"rejected"` - Verification rejected
+</ResponseField>
+
+<ResponseField name="completedAt" type="null" required>
+  Always `null` for new verifications. Use `getVerification()` to check for completion.
+</ResponseField>
+
+#### Example Response
+
+```json
+{
+  "url": "https://verify.example.com/session/abc123",
+  "status": "awaiting_compliance_verification",
+  "completedAt": null
+}
+```
+
+---
+
+### getVerification()
+
+Retrieve the current status of a KYC verification process.
+
+```typescript
+const status = await bloque.compliance.kyc.getVerification({
+  urn: 'did:bloque:origin:ethereum-mainnet:0x742d35...'
+});
+
+if (status.status === 'approved') {
+  console.log(`Verification completed at: ${status.completedAt}`);
+}
+```
+
+#### Parameters
+
+<ParamField path="urn" type="string" required>
+  URN (Uniform Resource Name) that uniquely identifies the user within the system.
+  
+  Example: `"did:bloque:user:123e4567"`
+</ParamField>
+
+#### Returns
+
+<ResponseField name="status" type="string" required>
+  Current status of the verification
+  
+  Possible values:
+  - `"awaiting_compliance_verification"` - Still pending user action
+  - `"approved"` - Verification approved
+  - `"rejected"` - Verification rejected
+</ResponseField>
+
+<ResponseField name="url" type="string" required>
+  URL where the user can view or complete the verification
+</ResponseField>
+
+<ResponseField name="completedAt" type="string | null" required>
+  ISO 8601 timestamp when the verification was completed.
+  
+  `null` if verification is not yet completed.
+  
+  Example: `"2024-01-15T10:30:00Z"`
+</ResponseField>
+
+#### Example Response
+
+```json
+{
+  "status": "approved",
+  "url": "https://verify.example.com/session/abc123",
+  "completedAt": "2024-01-15T10:30:00Z"
+}
+```
+
+## Complete KYC Flow
+
+### 1. Start Verification
+
+```typescript
+// User has registered their identity
+const userUrn = 'did:bloque:origin:ethereum-mainnet:0x742d35...';
+
+// Start KYC process
+const verification = await bloque.compliance.kyc.startVerification({
+  urn: userUrn,
+  webhookUrl: 'https://api.myapp.com/webhooks/kyc'
+});
+
+// Send verification URL to user
+sendEmailToUser({
+  subject: 'Complete Your Identity Verification',
+  verificationUrl: verification.url
+});
+```
+
+### 2. Poll for Status (Optional)
+
+```typescript
+// Check verification status periodically
+const checkStatus = async () => {
+  const status = await bloque.compliance.kyc.getVerification({ urn: userUrn });
+  
+  if (status.status === 'approved') {
+    console.log('✓ KYC approved!');
+    return 'approved';
+  } else if (status.status === 'rejected') {
+    console.log('✗ KYC rejected');
+    return 'rejected';
+  } else {
+    console.log('⏳ Still pending...');
+    return 'pending';
+  }
+};
+
+// Poll every 30 seconds
+const pollInterval = setInterval(async () => {
+  const result = await checkStatus();
+  if (result !== 'pending') {
+    clearInterval(pollInterval);
+  }
+}, 30000);
+```
+
+### 3. Handle Webhook (Recommended)
+
+```typescript
+// Express.js webhook handler
+app.post('/webhooks/kyc', async (req, res) => {
+  const { urn, status, completedAt } = req.body;
+  
+  if (status === 'approved') {
+    // Enable account features
+    await enablePremiumFeatures(urn);
+    
+    // Notify user
+    await notifyUser(urn, {
+      title: 'KYC Approved',
+      message: 'Your identity has been verified!'
+    });
+  } else if (status === 'rejected') {
+    // Handle rejection
+    await notifyUser(urn, {
+      title: 'KYC Rejected',
+      message: 'Please contact support for assistance.'
+    });
+  }
+  
+  res.sendStatus(200);
+});
+```
+
+## Error Handling
+
+```typescript
+try {
+  const verification = await bloque.compliance.kyc.startVerification({
+    urn: userUrn,
+    webhookUrl: 'https://api.example.com/webhooks/kyc'
+  });
+} catch (error) {
+  if (error instanceof BloqueValidationError) {
+    console.error('Invalid URN or webhook URL');
+  } else if (error instanceof BloqueAuthenticationError) {
+    console.error('API key invalid or expired');
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}
+```

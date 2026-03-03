@@ -1,0 +1,500 @@
+---
+title: BankTransferClient
+description: Generic bank transfer client for cash-out swaps
+---
+
+## Overview
+
+The `BankTransferClient` enables direct bank transfer cash-outs to any supported Colombian bank. Unlike PSE (which is a payment collection method), bank transfers allow you to send funds from a Kusama account to a traditional Colombian bank account.
+
+Key features:
+- Supports all major Colombian banks
+- Direct transfers to savings or checking accounts
+- Automatic execution with source account specification
+
+Access it via `bloque.swap.bankTransfer`.
+
+## Constructor
+
+The `BankTransferClient` is automatically initialized as part of the `SwapClient`.
+
+```typescript
+import { Bloque } from '@bloque/sdk';
+
+const bloque = new Bloque({ apiKey: 'your-api-key' });
+const bankTransferClient = bloque.swap.bankTransfer;
+```
+
+## Methods
+
+### create()
+
+Creates a bank transfer swap order to send funds from Kusama to a Colombian bank account.
+
+```typescript
+async create(params: CreateBankTransferOrderParams): Promise<CreateBankTransferOrderResult>
+```
+
+#### Parameters
+
+<ParamField path="params" type="CreateBankTransferOrderParams" required>
+  Bank transfer order parameters
+
+  <Expandable title="CreateBankTransferOrderParams properties">
+    <ParamField path="rateSig" type="string" required>
+      Rate signature obtained from `findRates()`
+    </ParamField>
+
+    <ParamField path="toMedium" type="SupportedBank" required>
+      Destination bank. Supported values:
+      - `bancolombia`
+      - `banco_de_bogota`
+      - `banco_davivienda`
+      - `banco_popular`
+      - `banco_bbva_colombia`
+      - `banco_av_villas`
+      - `banco_de_occidente`
+      - `banco_caja_social_bcsc`
+      - `banco_agrario_de_colombia`
+      - `banco_gnb_sudameris`
+      - `banco_falabella`
+      - `banco_pichincha`
+      - `banco_coomeva`
+      - `banco_finandina_bic`
+      - `banco_santander_de_negocios_colombia`
+      - `banco_w`
+      - `banco_btg_pactual_colombia`
+      - `banco_cooperativo_coopcentral`
+      - `banco_itau`
+      - `banco_bancamia`
+      - `banco_serfinanza`
+      - `banco_mundo_mujer`
+      - `banco_contactar`
+      - `banco_union`
+      - `citibank_colombia`
+      - `banco_jp_morgan_colombia`
+      - `davibank`
+      - `ban100`
+      - `lulo_bank`
+      - `mibanco`
+    </ParamField>
+
+    <ParamField path="depositInformation" type="BankDepositInformation" required>
+      Bank account information for fund delivery
+
+      <Expandable title="BankDepositInformation properties">
+        <ParamField path="bankAccountType" type="'savings' | 'checking'" required>
+          Bank account type
+          
+          **Example:** `"savings"`
+        </ParamField>
+
+        <ParamField path="bankAccountNumber" type="string" required>
+          Bank account number
+          
+          **Example:** `"5740088718"`
+        </ParamField>
+
+        <ParamField path="bankAccountHolderName" type="string" required>
+          Account holder's full name
+          
+          **Example:** `"david barinas"`
+        </ParamField>
+
+        <ParamField path="bankAccountHolderIdentificationType" type="'CC' | 'CE' | 'NIT' | 'PP'" required>
+          Account holder identification type:
+          - `CC`: Cédula de Ciudadanía
+          - `CE`: Cédula de Extranjería  
+          - `NIT`: Número de Identificación Tributaria
+          - `PP`: Pasaporte
+          
+          **Example:** `"CC"`
+        </ParamField>
+
+        <ParamField path="bankAccountHolderIdentificationValue" type="string" required>
+          Account holder identification number
+          
+          **Example:** `"123456789"`
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField path="args" type="KusamaAccountArgs" required>
+      Kusama account arguments for swap execution
+
+      <Expandable title="KusamaAccountArgs properties">
+        <ParamField path="sourceAccountUrn" type="string" required>
+          Account URN where funds will be debited from
+          
+          **Example:** `"did:bloque:card:1231231"`
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField path="amountSrc" type="string">
+      Source amount as bigint string (required if `type` is `'src'`)
+      
+      **Example:** `"100000000"`
+    </ParamField>
+
+    <ParamField path="amountDst" type="string">
+      Destination amount as bigint string (required if `type` is `'dst'`)
+      
+      **Example:** `"50000000"` represents 500000.00 COP
+    </ParamField>
+
+    <ParamField path="type" type="'src' | 'dst'" default="src">
+      Order type:
+      - `'src'`: Taker specifies exact source amount to pay
+      - `'dst'`: Taker specifies exact destination amount to receive
+    </ParamField>
+
+    <ParamField path="webhookUrl" type="string">
+      Optional webhook URL for order status notifications
+    </ParamField>
+
+    <ParamField path="nodeId" type="string">
+      Specific node ID to execute (defaults to first node)
+    </ParamField>
+
+    <ParamField path="metadata" type="Record<string, unknown>">
+      Additional metadata for the order
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+#### Returns
+
+<ResponseField name="CreateBankTransferOrderResult" type="object">
+  <Expandable title="CreateBankTransferOrderResult properties">
+    <ResponseField name="order" type="SwapOrder">
+      The created swap order
+
+      <Expandable title="SwapOrder properties">
+        <ResponseField name="id" type="string">
+          Unique order identifier
+        </ResponseField>
+
+        <ResponseField name="orderSig" type="string">
+          Order signature
+        </ResponseField>
+
+        <ResponseField name="rateSig" type="string">
+          Rate signature used for this order
+        </ResponseField>
+
+        <ResponseField name="swapSig" type="string">
+          Swap signature
+        </ResponseField>
+
+        <ResponseField name="taker" type="string">
+          Taker URN
+        </ResponseField>
+
+        <ResponseField name="maker" type="string">
+          Maker URN
+        </ResponseField>
+
+        <ResponseField name="fromAsset" type="string">
+          Source asset
+        </ResponseField>
+
+        <ResponseField name="toAsset" type="string">
+          Destination asset
+        </ResponseField>
+
+        <ResponseField name="fromMedium" type="string">
+          Source medium (always `"kusama"` for bank transfers)
+        </ResponseField>
+
+        <ResponseField name="toMedium" type="string">
+          Destination medium (bank name)
+        </ResponseField>
+
+        <ResponseField name="fromAmount" type="string">
+          Source amount
+        </ResponseField>
+
+        <ResponseField name="toAmount" type="string">
+          Destination amount
+        </ResponseField>
+
+        <ResponseField name="at" type="string">
+          Timestamp when the order was created
+        </ResponseField>
+
+        <ResponseField name="graphId" type="string">
+          Instruction graph ID for tracking execution
+        </ResponseField>
+
+        <ResponseField name="status" type="string">
+          Order status
+        </ResponseField>
+
+        <ResponseField name="metadata" type="Record<string, unknown>">
+          Additional metadata
+        </ResponseField>
+
+        <ResponseField name="createdAt" type="string">
+          Creation timestamp
+        </ResponseField>
+
+        <ResponseField name="updatedAt" type="string">
+          Last update timestamp
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="execution" type="ExecutionResult">
+      Execution result (if args were provided for auto-execution)
+
+      <Expandable title="ExecutionResult properties">
+        <ResponseField name="nodeId" type="string">
+          Node ID that was executed
+        </ResponseField>
+
+        <ResponseField name="result" type="object">
+          Execution result details
+
+          <Expandable title="result properties">
+            <ResponseField name="status" type="string">
+              Execution status (e.g., `"paused"`, `"completed"`)
+            </ResponseField>
+
+            <ResponseField name="name" type="string">
+              Name of the current step
+            </ResponseField>
+
+            <ResponseField name="description" type="string">
+              Description of what happened or what's next
+            </ResponseField>
+
+            <ResponseField name="how" type="ExecutionHow">
+              Instructions for completing this step (if applicable)
+
+              <Expandable title="ExecutionHow properties">
+                <ResponseField name="type" type="string">
+                  Type of action required
+                </ResponseField>
+
+                <ResponseField name="url" type="string">
+                  URL for action (if type is "REDIRECT")
+                </ResponseField>
+              </Expandable>
+            </ResponseField>
+
+            <ResponseField name="callbackToken" type="string">
+              Callback token for tracking
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="requestId" type="string">
+      Request ID for tracking
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Example: Cash-out to Bancolombia
+
+```typescript
+// Step 1: Find available rates for DUSD -> COP via Kusama -> Bancolombia
+const rates = await bloque.swap.findRates({
+  fromAsset: 'DUSD/6',
+  toAsset: 'COP/2',
+  fromMediums: ['kusama'],
+  toMediums: ['bancolombia'],
+  amountSrc: '5000000' // 5.000000 DUSD
+});
+
+// Step 2: Create bank transfer order
+const result = await bloque.swap.bankTransfer.create({
+  rateSig: rates.rates[0].sig,
+  toMedium: 'bancolombia',
+  amountSrc: '5000000',
+  depositInformation: {
+    bankAccountType: 'savings',
+    bankAccountNumber: '5740088718',
+    bankAccountHolderName: 'Juan Pérez',
+    bankAccountHolderIdentificationType: 'CC',
+    bankAccountHolderIdentificationValue: '1234567890',
+  },
+  args: {
+    sourceAccountUrn: 'did:bloque:card:abc123'
+  },
+});
+
+console.log('Order ID:', result.order.id);
+console.log('Status:', result.order.status);
+console.log('From Amount:', result.order.fromAmount, 'DUSD');
+console.log('To Amount:', result.order.toAmount, 'COP');
+```
+
+#### Example: Cash-out to Banco de Bogotá (checking account)
+
+```typescript
+const result = await bloque.swap.bankTransfer.create({
+  rateSig: rate.sig,
+  toMedium: 'banco_de_bogota',
+  amountSrc: '2000000',
+  depositInformation: {
+    bankAccountType: 'checking',
+    bankAccountNumber: '987654321',
+    bankAccountHolderName: 'María López',
+    bankAccountHolderIdentificationType: 'CE',
+    bankAccountHolderIdentificationValue: '456789',
+  },
+  args: { sourceAccountUrn: 'did:bloque:card:xyz789' },
+});
+```
+
+#### Example: Using destination amount instead
+
+```typescript
+// Specify exact amount to receive in COP
+const result = await bloque.swap.bankTransfer.create({
+  rateSig: rate.sig,
+  toMedium: 'banco_bbva_colombia',
+  type: 'dst', // Specify we're providing destination amount
+  amountDst: '50000000', // Exactly 500,000.00 COP
+  depositInformation: {
+    bankAccountType: 'savings',
+    bankAccountNumber: '1122334455',
+    bankAccountHolderName: 'Carlos Ruiz',
+    bankAccountHolderIdentificationType: 'NIT',
+    bankAccountHolderIdentificationValue: '900123456',
+  },
+  args: { sourceAccountUrn: 'did:bloque:card:def456' },
+});
+```
+
+## Supported Banks
+
+The following Colombian banks are supported:
+
+| Bank Code | Bank Name |
+|-----------|----------|
+| `bancolombia` | Bancolombia |
+| `banco_de_bogota` | Banco de Bogotá |
+| `banco_davivienda` | Banco Davivienda |
+| `banco_popular` | Banco Popular |
+| `banco_bbva_colombia` | BBVA Colombia |
+| `banco_av_villas` | Banco AV Villas |
+| `banco_de_occidente` | Banco de Occidente |
+| `banco_caja_social_bcsc` | Banco Caja Social |
+| `banco_agrario_de_colombia` | Banco Agrario |
+| `banco_gnb_sudameris` | Banco GNB Sudameris |
+| `banco_falabella` | Banco Falabella |
+| `banco_pichincha` | Banco Pichincha |
+| `banco_coomeva` | Banco Coomeva |
+| `banco_finandina_bic` | Banco Finandina |
+| `banco_santander_de_negocios_colombia` | Santander Colombia |
+| `banco_w` | Banco W |
+| `banco_btg_pactual_colombia` | BTG Pactual |
+| `banco_cooperativo_coopcentral` | Coopcentral |
+| `banco_itau` | Banco Itaú |
+| `banco_bancamia` | Bancamía |
+| `banco_serfinanza` | Serfinanza |
+| `banco_mundo_mujer` | Banco Mundo Mujer |
+| `banco_contactar` | Banco Contactar |
+| `banco_union` | Banco Unión |
+| `citibank_colombia` | Citibank Colombia |
+| `banco_jp_morgan_colombia` | JP Morgan Colombia |
+| `davibank` | Davibank |
+| `ban100` | BAN100 |
+| `lulo_bank` | Lulo Bank |
+| `mibanco` | Mibanco |
+
+## Fee Structure for Bank Transfers
+
+Bank transfer fees typically include:
+
+1. **Exchange rate spread**: The difference between market rate and offered rate
+2. **Platform fee**: Bloque's service fee (percentage-based)
+3. **Bank transfer fee**: Fixed fee charged by the destination bank
+
+```typescript
+const rate = rates.rates[0];
+
+// Inspect fee breakdown
+console.log('Total fee:', rate.fee.value);
+console.log('Formula:', rate.fee.formula);
+
+for (const component of rate.fee.components) {
+  console.log(`${component.name}:`, component.value);
+  
+  if (component.type === 'fixed') {
+    console.log('  Fixed amount:', component.amount, 'COP');
+  } else if (component.type === 'percentage') {
+    console.log('  Percentage:', component.percentage, '%');
+  }
+}
+```
+
+## Transfer Flow
+
+1. **Find rates**: Use `swap.findRates()` with `fromMediums: ['kusama']` and `toMediums: [bankCode]`
+2. **Create order**: Call `bankTransfer.create()` with bank account details and source account
+3. **Auto-execution**: Funds are automatically debited from the source Kusama account
+4. **Bank processing**: Transfer is processed by the destination bank
+5. **Completion**: Funds arrive in the specified bank account
+
+## Webhook Notifications
+
+Receive real-time updates on transfer status:
+
+```typescript
+const result = await bloque.swap.bankTransfer.create({
+  rateSig: rate.sig,
+  toMedium: 'bancolombia',
+  amountSrc: '5000000',
+  webhookUrl: 'https://your-app.com/webhooks/bank-transfer',
+  depositInformation: { /* ... */ },
+  args: { sourceAccountUrn: 'did:bloque:card:abc123' },
+});
+```
+
+Webhook events include:
+- Order created
+- Transfer initiated
+- Transfer completed
+- Transfer failed (with reason)
+
+## Error Handling
+
+```typescript
+import { 
+  BloqueConfigError, 
+  BloqueValidationError,
+  BloqueInsufficientFundsError 
+} from '@bloque/sdk-core';
+
+try {
+  const result = await bloque.swap.bankTransfer.create(params);
+} catch (error) {
+  if (error instanceof BloqueConfigError) {
+    console.error('Not connected to a session');
+  } else if (error instanceof BloqueInsufficientFundsError) {
+    console.error('Insufficient funds in source account');
+  } else if (error instanceof BloqueValidationError) {
+    console.error('Invalid bank account details:', error.message);
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+## Related Types
+
+- `CreateBankTransferOrderParams` - Parameters for creating bank transfer orders
+- `CreateBankTransferOrderResult` - Result of creating bank transfer order
+- `BankDepositInformation` - Bank account details
+- `KusamaAccountArgs` - Source account arguments
+- `SupportedBank` - Supported bank codes
+- `BankAccountType` - Account type (savings/checking)
+- `IdentificationType` - ID types (CC/CE/NIT/PP)
+- `SwapOrder` - Swap order details
+- `ExecutionResult` - Auto-execution result
+- `OrderType` - Order type (src/dst)

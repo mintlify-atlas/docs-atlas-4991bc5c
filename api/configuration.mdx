@@ -1,0 +1,493 @@
+---
+title: 'Configuration'
+description: 'SDK configuration reference'
+---
+
+## BloqueSDKConfig
+
+Configuration object for initializing the Bloque SDK.
+
+```typescript
+import { SDK, type BloqueSDKConfig } from '@bloque/sdk';
+
+const config: BloqueSDKConfig = {
+  auth: { type: 'apiKey', apiKey: 'your-api-key' },
+  origin: 'your-origin',
+  mode: 'production'
+};
+
+const sdk = new SDK(config);
+```
+
+---
+
+## Required Fields
+
+<ParamField path="auth" type="AuthStrategy" required>
+  Authentication strategy for the SDK.
+
+  <Expandable title="AuthStrategy options">
+    <ParamField path="auth.type" type="'apiKey' | 'jwt'" required>
+      Authentication type:
+      - `'apiKey'`: For backend platforms (node, bun, deno)
+      - `'jwt'`: For frontend platforms (browser, react-native)
+    </ParamField>
+
+    <ParamField path="auth.apiKey" type="string">
+      API key for authentication. Required when `type === 'apiKey'`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Examples
+
+<Tabs>
+  <Tab title="API Key">
+    ```typescript
+    const config: BloqueSDKConfig = {
+      auth: {
+        type: 'apiKey',
+        apiKey: 'blq_live_1234567890abcdef'
+      },
+      origin: 'my-app'
+    };
+    ```
+  </Tab>
+  <Tab title="JWT">
+    ```typescript
+    const config: BloqueSDKConfig = {
+      auth: {
+        type: 'jwt'
+      },
+      platform: 'browser'
+    };
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Optional Fields
+
+<ParamField path="origin" type="string">
+  Origin identifier for scoping requests to a specific origin within the Bloque platform.
+
+  - **Required** for API key authentication
+  - **Optional** for JWT authentication (resolved during `authenticate()`)
+</ParamField>
+
+<ParamField path="mode" type="Mode">
+  SDK operation mode. Mutually exclusive with `baseUrl`.
+
+  - `'production'` (default): Production environment
+  - `'sandbox'`: Sandbox environment for testing
+
+  <Note>
+    Cannot be specified if `baseUrl` is provided.
+  </Note>
+</ParamField>
+
+<ParamField path="baseUrl" type="string">
+  Custom base URL for the SDK. Mutually exclusive with `mode`.
+
+  When specified, the SDK will use this URL for all requests instead of the default endpoints.
+
+  <Note>
+    Cannot be specified if `mode` is provided.
+  </Note>
+</ParamField>
+
+<ParamField path="platform" type="Platform">
+  Platform where the SDK is executed.
+
+  - `'node'` (default): Node.js runtime
+  - `'bun'`: Bun runtime
+  - `'deno'`: Deno runtime
+  - `'browser'`: Web browser environment
+  - `'react-native'`: React Native (iOS/Android)
+
+  **Backend platforms** (node, bun, deno):
+  - Support API key authentication
+  - No token storage required
+
+  **Frontend platforms** (browser, react-native):
+  - Require JWT authentication
+  - Cannot use private API keys
+</ParamField>
+
+<ParamField path="tokenStorage" type="TokenStorage">
+  JWT token storage strategy. Required for React Native with JWT authentication.
+
+  <Expandable title="TokenStorage interface">
+    <ParamField path="get" type="() => string | null" required>
+      Retrieves the currently stored JWT token.
+    </ParamField>
+
+    <ParamField path="set" type="(token: string) => void" required>
+      Persists a JWT token.
+    </ParamField>
+
+    <ParamField path="clear" type="() => void" required>
+      Clears the stored JWT token.
+    </ParamField>
+  </Expandable>
+
+  **Platform-specific behavior**:
+
+  - **Browser**: Optional. JWT requests use `credentials: 'include'` to send cookies.
+  - **React Native**: Required. The SDK reads the JWT from `tokenStorage` and sends it as `Authorization: Bearer <token>`.
+
+  <Warning>
+    **Security Considerations**:
+
+    - **localStorage/sessionStorage**: Vulnerable to XSS attacks. Only use for development/testing.
+    - **httpOnly Cookies** (recommended): Not accessible to JavaScript, protects against XSS.
+    - **Secure Storage** (recommended for mobile): Use platform-specific secure storage (Keychain on iOS, Keystore on Android).
+    - **In-Memory Storage**: Most secure against XSS, but lost on page refresh.
+  </Warning>
+</ParamField>
+
+<ParamField path="timeout" type="number">
+  Default timeout for HTTP requests in milliseconds.
+
+  - Default: `30000` (30 seconds)
+  - Set to `0` to disable timeouts globally (not recommended for production)
+  - Can be overridden per-request
+
+  When a request exceeds the timeout, it will be aborted and throw a `BloqueAPIError` with code `'TIMEOUT_ERROR'`.
+</ParamField>
+
+<ParamField path="retry" type="RetryConfig">
+  Retry configuration for failed requests.
+
+  The SDK automatically retries failed requests with exponential backoff for:
+  - 429 (Too Many Requests)
+  - 503 (Service Unavailable)
+  - Network errors (timeouts, connection failures)
+
+  The SDK respects the `Retry-After` header when present.
+
+  <Expandable title="RetryConfig interface">
+    <ParamField path="enabled" type="boolean">
+      Whether to enable automatic retries.
+
+      Default: `true`
+    </ParamField>
+
+    <ParamField path="maxRetries" type="number">
+      Maximum number of retry attempts.
+
+      Default: `3`
+    </ParamField>
+
+    <ParamField path="initialDelay" type="number">
+      Initial delay in milliseconds before the first retry.
+
+      Subsequent retries use exponential backoff: `delay * (2 ^ attempt)`.
+
+      Default: `1000` (1 second)
+    </ParamField>
+
+    <ParamField path="maxDelay" type="number">
+      Maximum delay in milliseconds between retries.
+
+      Prevents exponential backoff from growing too large.
+
+      Default: `30000` (30 seconds)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+---
+
+## Complete Examples
+
+<Tabs>
+  <Tab title="Node.js (Production)">
+    ```typescript
+    import { SDK } from '@bloque/sdk';
+
+    const sdk = new SDK({
+      auth: {
+        type: 'apiKey',
+        apiKey: process.env.BLOQUE_API_KEY!
+      },
+      origin: 'my-app',
+      mode: 'production',
+      platform: 'node',
+      timeout: 30000,
+      retry: {
+        enabled: true,
+        maxRetries: 3,
+        initialDelay: 1000,
+        maxDelay: 30000
+      }
+    });
+    ```
+  </Tab>
+  <Tab title="Node.js (Sandbox)">
+    ```typescript
+    import { SDK } from '@bloque/sdk';
+
+    const sdk = new SDK({
+      auth: {
+        type: 'apiKey',
+        apiKey: process.env.BLOQUE_SANDBOX_API_KEY!
+      },
+      origin: 'my-app',
+      mode: 'sandbox',
+      platform: 'node'
+    });
+    ```
+  </Tab>
+  <Tab title="Browser (JWT)">
+    ```typescript
+    import { SDK } from '@bloque/sdk';
+
+    const sdk = new SDK({
+      auth: {
+        type: 'jwt'
+      },
+      platform: 'browser',
+      mode: 'production',
+      tokenStorage: {
+        get: () => localStorage.getItem('bloque_token'),
+        set: (token) => localStorage.setItem('bloque_token', token),
+        clear: () => localStorage.removeItem('bloque_token')
+      }
+    });
+    ```
+  </Tab>
+  <Tab title="React Native">
+    ```typescript
+    import { SDK } from '@bloque/sdk';
+    import AsyncStorage from '@react-native-async-storage/async-storage';
+
+    const sdk = new SDK({
+      auth: {
+        type: 'jwt'
+      },
+      platform: 'react-native',
+      mode: 'production',
+      tokenStorage: {
+        get: async () => {
+          return await AsyncStorage.getItem('bloque_token');
+        },
+        set: async (token) => {
+          await AsyncStorage.setItem('bloque_token', token);
+        },
+        clear: async () => {
+          await AsyncStorage.removeItem('bloque_token');
+        }
+      }
+    });
+    ```
+  </Tab>
+  <Tab title="Custom Endpoint">
+    ```typescript
+    import { SDK } from '@bloque/sdk';
+
+    const sdk = new SDK({
+      auth: {
+        type: 'apiKey',
+        apiKey: process.env.BLOQUE_API_KEY!
+      },
+      origin: 'my-app',
+      baseUrl: 'https://custom-api.example.com',
+      platform: 'node'
+    });
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Type Definitions
+
+### Mode
+
+```typescript
+type Mode = 'production' | 'sandbox';
+```
+
+- `'production'`: Uses live endpoints and real data (default)
+- `'sandbox'`: Uses isolated endpoints and mock data for development and testing
+
+### Platform
+
+```typescript
+type Platform = 'node' | 'deno' | 'bun' | 'browser' | 'react-native';
+```
+
+**Backend platforms** (support API keys):
+- `'node'`: Node.js runtime for APIs and backend services
+- `'deno'`: Deno runtime for serverless functions and edge services
+- `'bun'`: Bun runtime for high-performance backend services
+
+**Frontend platforms** (JWT only):
+- `'browser'`: Web browser environment, uses `credentials: 'include'` for cookies
+- `'react-native'`: React Native (iOS/Android), requires `tokenStorage`
+
+### AuthStrategy
+
+```typescript
+type AuthStrategy = 
+  | { type: 'apiKey'; apiKey: string }
+  | { type: 'jwt' };
+```
+
+- **API Key**: For backend platforms, provides a private API key
+- **JWT**: For frontend platforms, uses JSON Web Tokens for authentication
+
+### TokenStorage
+
+```typescript
+interface TokenStorage {
+  get(): string | null;
+  set(token: string): void;
+  clear(): void;
+}
+```
+
+Defines how the SDK stores and retrieves JWT tokens in client environments.
+
+**Recommended implementations**:
+
+<Tabs>
+  <Tab title="httpOnly Cookies (Browser)">
+    ```typescript
+    const cookieStorage: TokenStorage = {
+      get: () => null, // Token sent automatically in httpOnly cookie
+      set: async (token) => {
+        // Send to server to set httpOnly cookie
+        await fetch('/api/auth/set-token', {
+          method: 'POST',
+          body: JSON.stringify({ token })
+        });
+      },
+      clear: async () => {
+        await fetch('/api/auth/logout', { method: 'POST' });
+      }
+    };
+    ```
+  </Tab>
+  <Tab title="Secure Storage (React Native)">
+    ```typescript
+    import * as SecureStore from 'expo-secure-store';
+
+    const secureStorage: TokenStorage = {
+      get: async () => {
+        return await SecureStore.getItemAsync('bloque_token');
+      },
+      set: async (token) => {
+        await SecureStore.setItemAsync('bloque_token', token);
+      },
+      clear: async () => {
+        await SecureStore.deleteItemAsync('bloque_token');
+      }
+    };
+    ```
+  </Tab>
+  <Tab title="In-Memory (Browser)">
+    ```typescript
+    let token: string | null = null;
+
+    const inMemoryStorage: TokenStorage = {
+      get: () => token,
+      set: (newToken) => { token = newToken; },
+      clear: () => { token = null; }
+    };
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Validation Rules
+
+<AccordionGroup>
+  <Accordion title="Mode and BaseURL are mutually exclusive">
+    You cannot specify both `mode` and `baseUrl` in the same configuration.
+
+    ```typescript
+    // ❌ Invalid
+    const config = {
+      mode: 'production',
+      baseUrl: 'https://custom-api.example.com', // Error!
+      auth: { type: 'apiKey', apiKey: 'key' }
+    };
+
+    // ✅ Valid - use mode
+    const config1 = {
+      mode: 'production',
+      auth: { type: 'apiKey', apiKey: 'key' }
+    };
+
+    // ✅ Valid - use baseUrl
+    const config2 = {
+      baseUrl: 'https://custom-api.example.com',
+      auth: { type: 'apiKey', apiKey: 'key' }
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="Platform and Auth compatibility">
+    Frontend platforms (`browser`, `react-native`) cannot use API key authentication.
+
+    ```typescript
+    // ❌ Invalid
+    const config = {
+      platform: 'browser',
+      auth: { type: 'apiKey', apiKey: 'key' } // Error!
+    };
+
+    // ✅ Valid
+    const config = {
+      platform: 'browser',
+      auth: { type: 'jwt' }
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="Origin requirement">
+    API key authentication requires `origin` to be specified.
+
+    ```typescript
+    // ❌ Invalid
+    const config = {
+      auth: { type: 'apiKey', apiKey: 'key' }
+      // Missing origin!
+    };
+
+    // ✅ Valid
+    const config = {
+      auth: { type: 'apiKey', apiKey: 'key' },
+      origin: 'my-app'
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="TokenStorage for React Native">
+    React Native with JWT authentication requires `tokenStorage`.
+
+    ```typescript
+    // ❌ Invalid
+    const config = {
+      platform: 'react-native',
+      auth: { type: 'jwt' }
+      // Missing tokenStorage!
+    };
+
+    // ✅ Valid
+    const config = {
+      platform: 'react-native',
+      auth: { type: 'jwt' },
+      tokenStorage: {
+        get: async () => await AsyncStorage.getItem('token'),
+        set: async (token) => await AsyncStorage.setItem('token', token),
+        clear: async () => await AsyncStorage.removeItem('token')
+      }
+    };
+    ```
+  </Accordion>
+</AccordionGroup>

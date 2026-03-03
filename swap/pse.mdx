@@ -1,0 +1,655 @@
+---
+title: 'PSE Integration'
+description: 'Accept payments via Colombia PSE (Pagos Seguros en Línea)'
+icon: 'building-columns'
+---
+
+## Overview
+
+The PSE client enables you to accept payments through Colombia's PSE (Pagos Seguros en Línea) payment system. PSE allows users to pay directly from their bank accounts.
+
+## Features
+
+- List available PSE banks
+- Create PSE top-up orders
+- Auto-execute with user bank selection
+- Redirect users to complete payment
+
+## List PSE Banks
+
+Retrieve all financial institutions available for PSE payments:
+
+```typescript
+const result = await user.swap.pse.banks();
+
+for (const bank of result.banks) {
+  console.log(`${bank.code}: ${bank.name}`);
+}
+```
+
+### Response
+
+<ResponseField name="banks" type="Bank[]">
+  Array of available PSE banks
+  
+  <Expandable title="Bank Object">
+    <ResponseField name="code" type="string">
+      Financial institution code used when creating orders
+      
+      **Example**: `"1"`, `"1007"`, `"1051"`
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Human-readable bank name
+      
+      **Example**: `"Banco de Bogotá"`, `"Bancolombia"`, `"Davivienda"`
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Create PSE Order
+
+Create a swap order using PSE as the payment source:
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  origin: process.env.ORIGIN,
+  auth: { type: 'apiKey', apiKey: process.env.API_KEY },
+  mode: 'sandbox',
+  platform: 'node'
+});
+
+const user = await bloque.connect('nestor');
+
+// 1. Find rates
+const rates = await user.swap.findRates({
+  fromAsset: 'COP/2',
+  toAsset: 'DUSD/6',
+  fromMediums: ['pse'],
+  toMediums: ['kusama'],
+  amountSrc: '10000000' // 100,000.00 COP
+});
+
+// 2. Get available banks
+const banks = await user.swap.pse.banks();
+
+// 3. Create PSE order with auto-execution
+const result = await user.swap.pse.create({
+  rateSig: rates.rates[0].sig,
+  toMedium: 'kusama',
+  amountSrc: '10000000',
+  depositInformation: {
+    urn: 'did:bloque:account:card:usr-abc123:crd-xyz789'
+  },
+  args: {
+    bankCode: banks.banks[0].code,
+    userType: 0,
+    customerEmail: 'user@example.com',
+    userLegalIdType: 'CC',
+    userLegalId: '1234567890',
+    customerData: {
+      fullName: 'John Doe',
+      phoneNumber: '3001234567'
+    }
+  }
+});
+
+// 4. Redirect user to complete payment
+if (result.execution?.result.how?.url) {
+  console.log('Redirect user to:', result.execution.result.how.url);
+  // In a web app: window.location.href = result.execution.result.how.url;
+}
+```
+
+## Parameters
+
+<ParamField path="rateSig" type="string" required>
+  Rate signature obtained from `findRates`
+  
+  ```typescript
+  const rates = await user.swap.findRates({...});
+  const rateSig = rates.rates[0].sig;
+  ```
+</ParamField>
+
+<ParamField path="toMedium" type="string" required>
+  Destination medium where funds will be deposited
+  
+  **Common values**: `"kusama"`, `"pomelo"`
+</ParamField>
+
+<ParamField path="amountSrc" type="string">
+  Source amount as scaled bigint string (required if `type` is `'src'`)
+  
+  **Example**: `"10000000"` = 100,000.00 COP for COP/2
+</ParamField>
+
+<ParamField path="amountDst" type="string">
+  Destination amount as scaled bigint string (required if `type` is `'dst'`)
+</ParamField>
+
+<ParamField path="type" type="'src' | 'dst'" default="src">
+  Order type:
+  - `src`: Specify exact source amount to pay
+  - `dst`: Specify exact destination amount to receive
+</ParamField>
+
+<ParamField path="depositInformation" type="DepositInformation" required>
+  Account where funds will be deposited
+  
+  <Expandable title="DepositInformation">
+    <ParamField path="depositInformation.urn" type="string" required>
+      Account URN in the format `did:bloque:account:card:usr-{userId}:crd-{cardId}`
+      
+      **Example**: `"did:bloque:account:card:usr-abc123:crd-xyz789"`
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="args" type="PsePaymentArgs" required>
+  PSE payment arguments for auto-execution
+  
+  <Expandable title="PsePaymentArgs">
+    <ParamField path="args.bankCode" type="string" required>
+      Bank code from the PSE banks list
+      
+      Get this from `user.swap.pse.banks()`
+      
+      **Example**: `"1"` (Banco de Bogotá), `"1007"` (Bancolombia)
+    </ParamField>
+    
+    <ParamField path="args.userType" type="0 | 1" required>
+      User type:
+      - `0`: Natural person (individual)
+      - `1`: Legal entity (company)
+    </ParamField>
+    
+    <ParamField path="args.customerEmail" type="string" required>
+      Customer's email address
+      
+      **Example**: `"user@example.com"`
+    </ParamField>
+    
+    <ParamField path="args.userLegalIdType" type="'CC' | 'NIT' | 'CE'" required>
+      Legal identification type:
+      - `CC`: Cédula de Ciudadanía (Citizenship Card)
+      - `NIT`: Número de Identificación Tributaria (Tax ID)
+      - `CE`: Cédula de Extranjería (Foreigner ID)
+    </ParamField>
+    
+    <ParamField path="args.userLegalId" type="string" required>
+      Legal identification number
+      
+      **Example**: `"1234567890"`
+    </ParamField>
+    
+    <ParamField path="args.customerData" type="PseCustomerData" required>
+      Additional customer information
+      
+      <Expandable title="PseCustomerData">
+        <ParamField path="args.customerData.fullName" type="string" required>
+          Customer's full name as it appears on their ID
+          
+          **Example**: `"John Doe"`
+        </ParamField>
+        
+        <ParamField path="args.customerData.phoneNumber" type="string" required>
+          Customer's phone number including country code
+          
+          **Example**: `"3001234567"`
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="webhookUrl" type="string">
+  Optional webhook URL for order status notifications
+  
+  Bloque will POST order updates to this URL
+</ParamField>
+
+<ParamField path="nodeId" type="string">
+  Specific instruction node ID to execute (defaults to first node)
+</ParamField>
+
+<ParamField path="metadata" type="Record<string, unknown>">
+  Additional metadata to attach to the order
+  
+  **Example**: `{ reference: 'ORDER-123', userId: 'user-456' }`
+</ParamField>
+
+## Response
+
+<ResponseField name="order" type="SwapOrder">
+  The created swap order
+  
+  <Expandable title="SwapOrder">
+    <ResponseField name="id" type="string">
+      Unique order identifier
+    </ResponseField>
+    
+    <ResponseField name="orderSig" type="string">
+      Order signature
+    </ResponseField>
+    
+    <ResponseField name="rateSig" type="string">
+      Rate signature used for this order
+    </ResponseField>
+    
+    <ResponseField name="swapSig" type="string">
+      Swap signature
+    </ResponseField>
+    
+    <ResponseField name="taker" type="string">
+      Taker URN (user creating the order)
+    </ResponseField>
+    
+    <ResponseField name="maker" type="string">
+      Maker URN (liquidity provider)
+    </ResponseField>
+    
+    <ResponseField name="fromAsset" type="string">
+      Source asset (e.g., `"COP/2"`)
+    </ResponseField>
+    
+    <ResponseField name="toAsset" type="string">
+      Destination asset (e.g., `"DUSD/6"`)
+    </ResponseField>
+    
+    <ResponseField name="fromMedium" type="string">
+      Source medium (`"pse"`)
+    </ResponseField>
+    
+    <ResponseField name="toMedium" type="string">
+      Destination medium (e.g., `"kusama"`)
+    </ResponseField>
+    
+    <ResponseField name="fromAmount" type="string">
+      Source amount as scaled bigint string
+    </ResponseField>
+    
+    <ResponseField name="toAmount" type="string">
+      Destination amount as scaled bigint string
+    </ResponseField>
+    
+    <ResponseField name="at" type="string">
+      Order creation timestamp
+    </ResponseField>
+    
+    <ResponseField name="graphId" type="string">
+      Instruction graph ID for tracking execution
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Order status (e.g., `"pending"`, `"completed"`, `"failed"`)
+    </ResponseField>
+    
+    <ResponseField name="metadata" type="Record<string, unknown>">
+      Custom metadata attached to the order
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      ISO timestamp of creation
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      ISO timestamp of last update
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="execution" type="ExecutionResult">
+  Execution result from auto-execution (only present if `args` were provided)
+  
+  <Expandable title="ExecutionResult">
+    <ResponseField name="nodeId" type="string">
+      Node ID that was executed
+    </ResponseField>
+    
+    <ResponseField name="result" type="object">
+      Execution result details
+      
+      <Expandable title="Result">
+        <ResponseField name="status" type="string">
+          Execution status (e.g., `"paused"`, `"completed"`)
+        </ResponseField>
+        
+        <ResponseField name="name" type="string">
+          Name of the current step
+        </ResponseField>
+        
+        <ResponseField name="description" type="string">
+          Description of what the user needs to do
+        </ResponseField>
+        
+        <ResponseField name="how" type="ExecutionHow">
+          Instructions for completing this step
+          
+          <Expandable title="ExecutionHow">
+            <ResponseField name="type" type="string">
+              Action type (typically `"REDIRECT"`)
+            </ResponseField>
+            
+            <ResponseField name="url" type="string">
+              URL to redirect the user to complete the PSE payment
+              
+              **This is the PSE checkout URL where the user completes their payment**
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+        
+        <ResponseField name="callbackToken" type="string">
+          Callback token for tracking
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="requestId" type="string">
+  Request ID for tracking and support
+</ResponseField>
+
+## PSE Payment Flow
+
+The complete PSE payment flow:
+
+```typescript
+// 1. User selects PSE payment and amount
+const userAmount = '10000000'; // 100,000.00 COP
+
+// 2. Find available rates
+const rates = await user.swap.findRates({
+  fromAsset: 'COP/2',
+  toAsset: 'DUSD/6',
+  fromMediums: ['pse'],
+  toMediums: ['kusama'],
+  amountSrc: userAmount
+});
+
+if (rates.rates.length === 0) {
+  throw new Error('No rates available');
+}
+
+// 3. Show user the best rate and fees
+const bestRate = rates.rates[0];
+console.log(`You pay: ${Number(userAmount) / 100} COP`);
+console.log(`You receive: ~${(Number(userAmount) * bestRate.ratio) / 1000000} DUSD`);
+console.log(`Fee: ${bestRate.fee.value}`);
+
+// 4. User selects their bank
+const banks = await user.swap.pse.banks();
+// Display banks to user, let them select
+const selectedBank = banks.banks.find(b => b.code === userSelectedCode);
+
+// 5. User provides their information and confirms
+const customerInfo = {
+  email: 'user@example.com',
+  fullName: 'John Doe',
+  idType: 'CC',
+  idNumber: '1234567890',
+  phoneNumber: '3001234567',
+  userType: 0 // Natural person
+};
+
+// 6. Create the PSE order
+const result = await user.swap.pse.create({
+  rateSig: bestRate.sig,
+  toMedium: 'kusama',
+  amountSrc: userAmount,
+  depositInformation: {
+    urn: 'did:bloque:account:card:usr-abc:crd-xyz'
+  },
+  args: {
+    bankCode: selectedBank.code,
+    userType: customerInfo.userType,
+    customerEmail: customerInfo.email,
+    userLegalIdType: customerInfo.idType,
+    userLegalId: customerInfo.idNumber,
+    customerData: {
+      fullName: customerInfo.fullName,
+      phoneNumber: customerInfo.phoneNumber
+    }
+  },
+  webhookUrl: 'https://yourapp.com/webhooks/pse',
+  metadata: {
+    userId: 'user-123',
+    sessionId: 'session-456'
+  }
+});
+
+// 7. Redirect user to PSE checkout
+if (result.execution?.result.how?.url) {
+  // In browser:
+  window.location.href = result.execution.result.how.url;
+  
+  // Or display as QR code, send via SMS, etc.
+}
+
+// 8. User completes payment on PSE site
+// PSE redirects back to your return URL
+// Bloque sends webhook notification when payment is confirmed
+
+// 9. Handle webhook notification
+// POST to https://yourapp.com/webhooks/pse
+// {
+//   "orderId": "ord-123",
+//   "status": "completed",
+//   "fromAmount": "10000000",
+//   "toAmount": "1000000"
+// }
+```
+
+## Handling Callbacks
+
+When the user completes their PSE payment, Bloque sends webhook notifications:
+
+```typescript
+// Express.js example
+app.post('/webhooks/pse', async (req, res) => {
+  const { orderId, status, fromAmount, toAmount } = req.body;
+  
+  if (status === 'completed') {
+    // Payment successful
+    console.log(`Order ${orderId} completed`);
+    console.log(`User paid ${fromAmount}, received ${toAmount}`);
+    
+    // Update your database, notify user, etc.
+    await updateOrderStatus(orderId, 'completed');
+    await notifyUser(orderId, 'Your payment was successful!');
+  } else if (status === 'failed') {
+    // Payment failed
+    console.log(`Order ${orderId} failed`);
+    await updateOrderStatus(orderId, 'failed');
+    await notifyUser(orderId, 'Payment failed. Please try again.');
+  }
+  
+  res.status(200).send('OK');
+});
+```
+
+## User Experience Tips
+
+<AccordionGroup>
+  <Accordion title="Show Fee Breakdown">
+    Display the fee breakdown before the user confirms:
+    
+    ```typescript
+    const rate = rates.rates[0];
+    console.log('Amount: 100,000.00 COP');
+    console.log('Fee breakdown:');
+    for (const component of rate.fee.components) {
+      if (component.type === 'percentage') {
+        console.log(`  ${component.name}: ${component.percentage * 100}%`);
+      } else if (component.type === 'fixed') {
+        console.log(`  ${component.name}: ${component.amount / 100} COP`);
+      }
+    }
+    console.log(`Total fee: ${rate.fee.value / 100} COP`);
+    console.log(`You receive: ${(100000 * rate.ratio) / 1000000} DUSD`);
+    ```
+  </Accordion>
+  
+  <Accordion title="Validate Amounts">
+    Check amount limits before creating orders:
+    
+    ```typescript
+    const [minFrom, maxFrom] = rate.fromLimits;
+    const userAmount = '10000000';
+    
+    if (BigInt(userAmount) < BigInt(minFrom)) {
+      throw new Error(`Minimum amount is ${Number(minFrom) / 100} COP`);
+    }
+    if (BigInt(userAmount) > BigInt(maxFrom)) {
+      throw new Error(`Maximum amount is ${Number(maxFrom) / 100} COP`);
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Handle Bank Selection">
+    Present banks in a user-friendly way:
+    
+    ```typescript
+    const banks = await user.swap.pse.banks();
+    
+    // Group popular banks first
+    const popularCodes = ['1007', '1051', '1001']; // Bancolombia, Davivienda, Bogotá
+    const popular = banks.banks.filter(b => popularCodes.includes(b.code));
+    const others = banks.banks.filter(b => !popularCodes.includes(b.code));
+    
+    console.log('Popular banks:');
+    popular.forEach(b => console.log(`  ${b.name}`));
+    
+    console.log('Other banks:');
+    others.forEach(b => console.log(`  ${b.name}`));
+    ```
+  </Accordion>
+  
+  <Accordion title="Save Order for Callback">
+    Store order details before redirecting:
+    
+    ```typescript
+    const result = await user.swap.pse.create({...});
+    
+    // Save to database
+    await db.orders.create({
+      orderId: result.order.id,
+      userId: 'user-123',
+      fromAmount: result.order.fromAmount,
+      toAmount: result.order.toAmount,
+      status: result.order.status,
+      checkoutUrl: result.execution?.result.how?.url,
+      createdAt: new Date()
+    });
+    
+    // Then redirect
+    window.location.href = result.execution.result.how.url;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Error Handling
+
+```typescript
+import { 
+  BloqueAPIError,
+  BloqueValidationError,
+  BloqueRateLimitError 
+} from '@bloque/sdk';
+
+try {
+  const result = await user.swap.pse.create({...});
+} catch (error) {
+  if (error instanceof BloqueValidationError) {
+    // Invalid parameters
+    console.error('Validation error:', error.message);
+    // Show user-friendly error message
+  } else if (error instanceof BloqueRateLimitError) {
+    // Rate limited
+    console.error('Too many requests, try again later');
+  } else if (error instanceof BloqueAPIError) {
+    // Other API error
+    console.error('API error:', error.requestId);
+    console.error('Message:', error.message);
+  } else {
+    // Unknown error
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+## Complete Example
+
+See the full working example:
+
+```typescript
+// From: examples/swap/pse-topup.ts
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  origin: process.env.ORIGIN!,
+  auth: {
+    type: 'apiKey',
+    apiKey: process.env.API_KEY!,
+  },
+  mode: 'sandbox',
+  platform: 'node',
+});
+
+const user = await bloque.connect('nestor');
+
+const rates = await user.swap.findRates({
+  fromAsset: 'COP/2',
+  toAsset: 'DUSD/6',
+  fromMediums: ['pse'],
+  toMediums: ['kusama'],
+  amountSrc: '1000000',
+});
+
+console.log('Available swap rates:', rates.rates[0]);
+
+if (rates.rates.length === 0) {
+  throw new Error(
+    'No swap rates available for the specified assets and mediums.',
+  );
+}
+
+const banks = await user.swap.pse.banks();
+console.log('Available PSE banks:', banks.banks);
+
+const result = await user.swap.pse.create({
+  rateSig: rates.rates[0]!?.sig,
+  toMedium: 'kusama',
+  amountSrc: '1000000',
+  depositInformation: {
+    urn: 'did:bloque:account:card:usr-xxx:crd-xxx',
+  },
+  args: {
+    bankCode: banks.banks[0]!?.code,
+    userType: 0,
+    customerEmail: 'user@example.com',
+    userLegalIdType: 'CC',
+    userLegalId: '123456789',
+    customerData: {
+      fullName: 'John Doe',
+      phoneNumber: '3001234567'
+    },
+  },
+});
+
+console.log('PSE Top-up order created:', result.execution?.result.how?.url);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Exchange Rates" icon="chart-line" href="/swap/rates">
+    Learn more about finding and using exchange rates
+  </Card>
+  <Card title="Bank Transfers" icon="money-bill-transfer" href="/swap/bank-transfers">
+    Cash out to Colombian banks
+  </Card>
+</CardGroup>

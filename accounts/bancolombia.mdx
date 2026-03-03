@@ -1,0 +1,444 @@
+---
+title: 'Bancolombia Accounts'
+description: 'Create and manage Bancolombia bank accounts with BancolombiaClient'
+---
+
+## Overview
+
+The BancolombiaClient provides methods for creating and managing Bancolombia bank accounts for Colombian users. These accounts integrate with Colombia's largest bank to provide seamless banking services.
+
+## Accessing BancolombiaClient
+
+```typescript
+import { SDK } from '@bloque/sdk';
+
+const bloque = new SDK({
+  auth: {
+    type: 'apiKey',
+    apiKey: process.env.BLOQUE_API_KEY,
+  },
+});
+
+const user = await bloque.connect('@username');
+const bancolombiaClient = user.accounts.bancolombia;
+```
+
+## Creating Bancolombia Accounts
+
+### Basic Creation
+
+```typescript
+const account = await user.accounts.bancolombia.create({
+  name: 'Main Account',
+});
+
+console.log(account.urn);
+console.log(account.referenceCode);
+console.log(account.status); // 'creation_in_progress'
+```
+
+### Wait for Active Status
+
+Use the `waitLedger` option to wait for the account to become active:
+
+```typescript
+const account = await user.accounts.bancolombia.create(
+  {
+    name: 'Main Account',
+  },
+  { waitLedger: true }
+);
+
+console.log(account.status);        // 'active'
+console.log(account.referenceCode); // Bancolombia reference code
+console.log(account.balance);
+```
+
+### Create with Metadata
+
+```typescript
+const account = await user.accounts.bancolombia.create({
+  name: 'Business Account',
+  metadata: {
+    purpose: 'business',
+    department: 'finance',
+  },
+});
+```
+
+### Create with Webhook
+
+```typescript
+const account = await user.accounts.bancolombia.create({
+  name: 'Monitored Account',
+  webhookUrl: 'https://api.example.com/webhooks/bancolombia-events',
+});
+```
+
+### Link to Existing Ledger
+
+Share a ledger account with other accounts:
+
+```typescript
+// Create virtual account first
+const virtual = await user.accounts.virtual.create({}, { waitLedger: true });
+
+// Create Bancolombia account linked to same ledger
+const bancolombia = await user.accounts.bancolombia.create(
+  {
+    ledgerId: virtual.ledgerId,
+    name: 'Shared Account',
+  },
+  { waitLedger: true }
+);
+
+// Both accounts share the same balance
+```
+
+## Listing Bancolombia Accounts
+
+### List All Accounts
+
+```typescript
+const { accounts } = await user.accounts.bancolombia.list();
+
+accounts.forEach(account => {
+  console.log(account.urn);
+  console.log(account.referenceCode);
+  console.log(account.status);
+  console.log(account.balance);
+});
+```
+
+### Get Specific Account
+
+```typescript
+const { accounts } = await user.accounts.bancolombia.list({
+  urn: 'did:bloque:account:bancolombia:abc-123'
+});
+
+const account = accounts[0];
+```
+
+## Bancolombia Account Details
+
+The `BancolombiaAccount` type includes:
+
+<ResponseField name="urn" type="string" required>
+  Unique resource name for the Bancolombia account
+</ResponseField>
+
+<ResponseField name="id" type="string" required>
+  Account ID
+</ResponseField>
+
+<ResponseField name="referenceCode" type="string" required>
+  Bancolombia-specific reference code for the account
+</ResponseField>
+
+<ResponseField name="status" type="AccountStatus" required>
+  Current status: `creation_in_progress`, `active`, `disabled`, `frozen`, `deleted`, or `creation_failed`
+</ResponseField>
+
+<ResponseField name="ownerUrn" type="string" required>
+  URN of the account owner
+</ResponseField>
+
+<ResponseField name="ledgerId" type="string" required>
+  Ledger account ID associated with this account
+</ResponseField>
+
+<ResponseField name="webhookUrl" type="string | null">
+  Webhook URL for account events (if configured)
+</ResponseField>
+
+<ResponseField name="metadata" type="Record<string, unknown>">
+  Custom metadata attached to the account
+</ResponseField>
+
+<ResponseField name="balance" type="Record<string, TokenBalance>">
+  Token balances by asset (included in list responses and after creation)
+</ResponseField>
+
+## Managing Bancolombia Accounts
+
+### Update Metadata
+
+```typescript
+const account = await user.accounts.bancolombia.updateMetadata({
+  urn: 'did:bloque:mediums:bancolombia:account:123',
+  metadata: {
+    updated_by: 'admin',
+    update_reason: 'customer_request',
+  },
+});
+```
+
+<Warning>
+The `name` and `source` fields are reserved and cannot be modified through `updateMetadata`. Use `updateName` to change the account name.
+</Warning>
+
+### Update Account Name
+
+```typescript
+const account = await user.accounts.bancolombia.updateName(
+  'did:bloque:mediums:bancolombia:account:123',
+  'Main Business Account'
+);
+```
+
+### Activate Account
+
+```typescript
+const account = await user.accounts.bancolombia.activate(
+  'did:bloque:mediums:bancolombia:account:123'
+);
+
+console.log(account.status); // 'active'
+```
+
+### Freeze Account
+
+```typescript
+const account = await user.accounts.bancolombia.freeze(
+  'did:bloque:mediums:bancolombia:account:123'
+);
+
+console.log(account.status); // 'frozen'
+```
+
+### Disable Account
+
+```typescript
+const account = await user.accounts.bancolombia.disable(
+  'did:bloque:mediums:bancolombia:account:123'
+);
+
+console.log(account.status); // 'disabled'
+```
+
+## Using Bancolombia Accounts
+
+### Check Balance
+
+Use the general `accounts.balance()` method:
+
+```typescript
+const balance = await user.accounts.balance(
+  'did:bloque:account:bancolombia:abc-123'
+);
+
+Object.entries(balance).forEach(([asset, b]) => {
+  console.log(`${asset}:`);
+  console.log(`  Current: ${b.current}`);
+  console.log(`  Pending: ${b.pending}`);
+  console.log(`  In: ${b.in}`);
+  console.log(`  Out: ${b.out}`);
+});
+```
+
+### Transfer Funds
+
+```typescript
+// Transfer from Bancolombia to virtual account
+const transfer = await user.accounts.transfer({
+  sourceUrn: 'did:bloque:account:bancolombia:abc-123',
+  destinationUrn: 'did:bloque:account:virtual:acc-12345',
+  amount: '50000000',
+  asset: 'DUSD/6',
+  metadata: {
+    reference: 'internal-transfer',
+  },
+});
+```
+
+### View Transaction History
+
+```typescript
+const { data, hasMore, next } = await user.accounts.movements({
+  urn: 'did:bloque:account:bancolombia:abc-123',
+  asset: 'DUSD/6',
+  limit: 50,
+});
+
+data.forEach(movement => {
+  console.log(movement.type);      // 'deposit' | 'withdraw' | 'transfer'
+  console.log(movement.amount);
+  console.log(movement.direction); // 'in' | 'out'
+  console.log(movement.status);
+});
+```
+
+## Common Use Cases
+
+### Receiving Payments
+
+Set up a Bancolombia account to receive payments:
+
+```typescript
+const account = await user.accounts.bancolombia.create(
+  {
+    name: 'Payment Collection',
+    webhookUrl: 'https://api.example.com/webhooks/payments',
+  },
+  { waitLedger: true }
+);
+
+console.log('Reference Code:', account.referenceCode);
+
+// Monitor for incoming payments
+const { data } = await user.accounts.movements({
+  urn: account.urn,
+  asset: 'DUSD/6',
+  direction: 'in',
+});
+
+data.forEach(payment => {
+  if (payment.status === 'settled') {
+    console.log('Received payment:', payment.amount);
+  }
+});
+```
+
+### Multi-Account Management
+
+Manage multiple Bancolombia accounts for different purposes:
+
+```typescript
+// Personal account
+const personalAccount = await user.accounts.bancolombia.create({
+  name: 'Personal Account',
+  metadata: {
+    type: 'personal',
+  },
+});
+
+// Business account
+const businessAccount = await user.accounts.bancolombia.create({
+  name: 'Business Account',
+  metadata: {
+    type: 'business',
+  },
+});
+
+// List all accounts
+const { accounts } = await user.accounts.bancolombia.list();
+```
+
+### Integration with Cards
+
+Link a Bancolombia account to a card:
+
+```typescript
+// Create Bancolombia account
+const bancolombia = await user.accounts.bancolombia.create(
+  { name: 'Main Account' },
+  { waitLedger: true }
+);
+
+// Create card linked to same ledger
+const card = await user.accounts.card.create(
+  {
+    ledgerId: bancolombia.ledgerId,
+    name: 'Bancolombia Card',
+  },
+  { waitLedger: true }
+);
+
+// Transfer from Bancolombia to card
+const transfer = await user.accounts.transfer({
+  sourceUrn: bancolombia.urn,
+  destinationUrn: card.urn,
+  amount: '100000000',
+  asset: 'DUSD/6',
+});
+```
+
+## API Reference
+
+### create()
+
+Create a new Bancolombia account.
+
+<ParamField path="params" type="CreateBancolombiaAccountParams">
+  <ParamField path="name" type="string">
+    Display name for the account
+  </ParamField>
+  <ParamField path="ledgerId" type="string">
+    Ledger account ID to associate with the Bancolombia account
+  </ParamField>
+  <ParamField path="webhookUrl" type="string">
+    Webhook URL to receive account events
+  </ParamField>
+  <ParamField path="metadata" type="Record<string, unknown>">
+    Custom metadata to attach to the Bancolombia account
+  </ParamField>
+</ParamField>
+
+<ParamField path="options" type="CreateAccountOptions">
+  <ParamField path="waitLedger" type="boolean" default={false}>
+    If true, wait for the account to become active before returning
+  </ParamField>
+  <ParamField path="timeout" type="number" default={60000}>
+    Maximum time to wait in milliseconds (only applies when waitLedger is true)
+  </ParamField>
+</ParamField>
+
+### list()
+
+List Bancolombia accounts.
+
+<ParamField path="params" type="ListBancolombiaAccountsParams">
+  <ParamField path="urn" type="string">
+    URN of a specific Bancolombia account to retrieve
+  </ParamField>
+</ParamField>
+
+### updateMetadata()
+
+Update Bancolombia account metadata.
+
+<ParamField path="params" type="UpdateBancolombiaMetadataParams" required>
+  <ParamField path="urn" type="string" required>
+    URN of the Bancolombia account to update
+  </ParamField>
+  <ParamField path="metadata" type="Record<string, unknown>" required>
+    Metadata to update (name and source are reserved)
+  </ParamField>
+</ParamField>
+
+### updateName()
+
+Update Bancolombia account name.
+
+<ParamField path="urn" type="string" required>
+  Bancolombia account URN
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  New name for the account
+</ParamField>
+
+### activate()
+
+Activate a Bancolombia account.
+
+<ParamField path="urn" type="string" required>
+  Bancolombia account URN
+</ParamField>
+
+### freeze()
+
+Freeze a Bancolombia account.
+
+<ParamField path="urn" type="string" required>
+  Bancolombia account URN
+</ParamField>
+
+### disable()
+
+Disable a Bancolombia account.
+
+<ParamField path="urn" type="string" required>
+  Bancolombia account URN
+</ParamField>
